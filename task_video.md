@@ -1,0 +1,4 @@
+- [ ] Add `videoUrl` to `LinkMetadata`
+- [ ] Implement video URL extraction in `_fetchMetadata`
+- [ ] Add `Chewie` player integration `UrlPreview` widget
+- [ ] Test with fxtwitter and other video links

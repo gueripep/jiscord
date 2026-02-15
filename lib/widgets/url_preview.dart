@@ -3,7 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:html/parser.dart' as parser;
 import 'package:html/dom.dart' as dom;
+
 import 'package:url_launcher/url_launcher.dart';
+import 'package:video_player/video_player.dart';
+import 'package:chewie/chewie.dart';
 
 class UrlPreview extends StatefulWidget {
   final String url;
@@ -26,6 +29,18 @@ class _UrlPreviewState extends State<UrlPreview> {
   static final Map<String, LinkMetadata?> _cache = {};
 
   late Future<LinkMetadata?> _metadataFuture;
+  VideoPlayerController? _videoPlayerController;
+  ChewieController? _chewieController;
+  bool _isPlaying = false;
+  bool _isInitializing = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _videoPlayerController?.dispose();
+    _chewieController?.dispose();
+    super.dispose();
+  }
 
   @override
   void initState() {
@@ -44,19 +59,19 @@ class _UrlPreviewState extends State<UrlPreview> {
         return null; // Don't try to fetch non-http URLs
       }
 
-      // Special handling for fxtwitter/vxtwitter/fixupx API
-      if (uri.host.contains('fxtwitter.com') ||
-          uri.host.contains('vxtwitter.com') ||
+      // Special handling for Twitter/X and proxies (fxtwitter, vxtwitter, fixupx, etc.)
+      if (uri.host.contains('twitter.com') ||
+          uri.host.contains('x.com') ||
           uri.host.contains('fixupx.com')) {
         try {
-          // Manual URI construction to avoid Uri.https edge cases
-          final host = uri.host.replaceAll("www.", "");
+          // Force use of api.fxtwitter.com as the canonical API endpoint
+          const apiAuthority = 'api.fxtwitter.com';
           final path = uri.path
               .replaceAll('/i/', '/')
               .replaceAll('/i/status/', '/status/');
           // Ensure we don't have double slashes or missing status
 
-          final apiUri = Uri.https('api.$host', path);
+          final apiUri = Uri.https(apiAuthority, path);
 
           final response = await http.get(
             apiUri,
@@ -77,12 +92,30 @@ class _UrlPreviewState extends State<UrlPreview> {
             final tweet = json['tweet'];
             if (tweet != null) {
               String? startImage;
+              String? videoUrl;
 
               if (tweet['media'] != null) {
                 final media = tweet['media'];
                 if (media['videos'] != null &&
                     (media['videos'] as List).isNotEmpty) {
                   startImage = media['videos'][0]['thumbnail_url'];
+                  // Get the highest bitrate video URL
+                  final variants = media['videos'][0]['variants'] as List?;
+                  if (variants != null) {
+                    final videoVariant = variants
+                        .where((v) => v['content_type'] == 'video/mp4')
+                        .toList();
+                    // Sort by bitrate descending
+                    videoVariant.sort(
+                      (a, b) =>
+                          (b['bitrate'] ?? 0).compareTo(a['bitrate'] ?? 0),
+                    );
+                    if (videoVariant.isNotEmpty) {
+                      videoUrl = videoVariant.first['url'];
+                    }
+                  } else {
+                    videoUrl = media['videos'][0]['url'];
+                  }
                 } else if (media['photos'] != null &&
                     (media['photos'] as List).isNotEmpty) {
                   startImage = media['photos'][0]['url'];
@@ -97,6 +130,7 @@ class _UrlPreviewState extends State<UrlPreview> {
                     '${tweet['author']?['name']} (@${tweet['author']?['screen_name']})',
                 description: tweet['text'],
                 imageUrl: startImage,
+                videoUrl: videoUrl,
                 siteName: 'FxTwitter', // Or dynamic based on host
                 url: widget.url,
                 themeColor: const Color(0xFF1DA1F2), // Twitter Blue
@@ -147,6 +181,7 @@ class _UrlPreviewState extends State<UrlPreview> {
     String? title;
     String? description;
     String? imageUrl;
+    String? videoUrl;
     String? siteName;
     Color? themeColor;
 
@@ -168,13 +203,15 @@ class _UrlPreviewState extends State<UrlPreview> {
         getMetaContent('twitter:description') ??
         getMetaContent('description');
 
+    videoUrl =
+        getMetaContent('og:video') ??
+        getMetaContent('og:video:url') ??
+        getMetaContent('og:video:secure_url');
+
     imageUrl =
         getMetaContent('og:image') ??
         getMetaContent('twitter:image') ??
-        getMetaContent('twitter:image:src') ??
-        getMetaContent('og:video') ??
-        getMetaContent('og:video:secure_url') ??
-        getMetaContent('og:video:url');
+        getMetaContent('twitter:image:src');
 
     siteName = getMetaContent('og:site_name') ?? getMetaContent('twitter:site');
 
@@ -195,6 +232,7 @@ class _UrlPreviewState extends State<UrlPreview> {
       title: title,
       description: description,
       imageUrl: imageUrl,
+      videoUrl: videoUrl,
       siteName: siteName,
       themeColor: themeColor,
       url: baseUrl.toString(),
@@ -276,14 +314,57 @@ class _UrlPreviewState extends State<UrlPreview> {
                   if (metadata.imageUrl != null)
                     LayoutBuilder(
                       builder: (context, constraints) {
-                        return Image.network(
-                          metadata.imageUrl!,
-                          width: double.infinity,
-                          height: 200, // Fixed height for hero image
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) =>
-                              const SizedBox.shrink(),
-                        );
+                        return _isPlaying && _chewieController != null
+                            ? SizedBox(
+                                height: 200,
+                                child: Chewie(controller: _chewieController!),
+                              )
+                            : Stack(
+                                alignment: Alignment.center,
+                                children: [
+                                  Image.network(
+                                    metadata.imageUrl!,
+                                    width: double.infinity,
+                                    height: 200, // Fixed height for hero image
+                                    fit: BoxFit.cover,
+                                    errorBuilder:
+                                        (context, error, stackTrace) =>
+                                            const SizedBox.shrink(),
+                                  ),
+                                  if (metadata.videoUrl != null)
+                                    _isInitializing
+                                        ? const CircularProgressIndicator()
+                                        : IconButton(
+                                            onPressed: () =>
+                                                _playVideo(metadata.videoUrl!),
+                                            icon: Container(
+                                              decoration: BoxDecoration(
+                                                color: Colors.black.withOpacity(
+                                                  0.5,
+                                                ),
+                                                shape: BoxShape.circle,
+                                              ),
+                                              padding: const EdgeInsets.all(12),
+                                              child: const Icon(
+                                                Icons.play_arrow,
+                                                size: 48,
+                                                color: Colors.white,
+                                              ),
+                                            ),
+                                          ),
+                                  if (_error != null)
+                                    Container(
+                                      color: Colors.black54,
+                                      padding: const EdgeInsets.all(8),
+                                      child: Text(
+                                        _error!,
+                                        style: const TextStyle(
+                                          color: Colors.red,
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              );
                       },
                     ),
                 ],
@@ -294,12 +375,55 @@ class _UrlPreviewState extends State<UrlPreview> {
       },
     );
   }
+
+  Future<void> _playVideo(String url) async {
+    setState(() {
+      _isInitializing = true;
+      _error = null;
+    });
+
+    try {
+      _videoPlayerController = VideoPlayerController.networkUrl(Uri.parse(url));
+      await _videoPlayerController!.initialize();
+
+      _chewieController = ChewieController(
+        videoPlayerController: _videoPlayerController!,
+        autoPlay: true,
+        looping: false,
+        aspectRatio: _videoPlayerController!.value.aspectRatio,
+        errorBuilder: (context, errorMessage) {
+          return Center(
+            child: Text(
+              errorMessage,
+              style: const TextStyle(color: Colors.white),
+            ),
+          );
+        },
+      );
+
+      if (mounted) {
+        setState(() {
+          _isPlaying = true;
+          _isInitializing = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isInitializing = false;
+          _error = 'Failed to load video';
+        });
+      }
+      debugPrint('Error playing video: $e');
+    }
+  }
 }
 
 class LinkMetadata {
   final String? title;
   final String? description;
   final String? imageUrl;
+  final String? videoUrl;
   final String? siteName;
   final Color? themeColor;
   final String url;
@@ -308,6 +432,7 @@ class LinkMetadata {
     this.title,
     this.description,
     this.imageUrl,
+    this.videoUrl,
     this.siteName,
     this.themeColor,
     required this.url,
