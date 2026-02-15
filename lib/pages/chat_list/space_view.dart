@@ -50,7 +50,6 @@ class SpaceView extends StatefulWidget {
 
 class _SpaceViewState extends State<SpaceView> {
   final List<SpaceRoomsChunk$2> _discoveredChildren = [];
-  final TextEditingController _filterController = TextEditingController();
   String? _nextBatch;
   bool _noMoreRooms = false;
   bool _isLoading = false;
@@ -478,47 +477,13 @@ class _SpaceViewState extends State<SpaceView> {
                   .where((s) => s.hasRoomUpdate)
                   .rateLimit(const Duration(seconds: 1)),
               builder: (context, snapshot) {
-                final filter = _filterController.text.trim().toLowerCase();
                 return CustomScrollView(
                   slivers: [
-                    SliverAppBar(
-                      floating: true,
-                      scrolledUnderElevation: 0,
-                      backgroundColor: Colors.transparent,
-                      automaticallyImplyLeading: false,
-                      title: TextField(
-                        controller: _filterController,
-                        onChanged: (_) => setState(() {}),
-                        textInputAction: TextInputAction.search,
-                        decoration: InputDecoration(
-                          filled: true,
-                          fillColor: theme.colorScheme.secondaryContainer,
-                          border: OutlineInputBorder(
-                            borderSide: BorderSide.none,
-                            borderRadius: BorderRadius.circular(99),
-                          ),
-                          contentPadding: EdgeInsets.zero,
-                          hintText: L10n.of(context).search,
-                          hintStyle: TextStyle(
-                            color: theme.colorScheme.onPrimaryContainer,
-                            fontWeight: FontWeight.normal,
-                          ),
-                          floatingLabelBehavior: FloatingLabelBehavior.never,
-                          prefixIcon: IconButton(
-                            onPressed: () {},
-                            icon: Icon(
-                              Icons.search_outlined,
-                              color: theme.colorScheme.onPrimaryContainer,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
                     SliverList.builder(
                       itemCount: _discoveredChildren.length + 1,
                       itemBuilder: (context, i) {
                         if (i == _discoveredChildren.length) {
-                          if (_noMoreRooms) {
+                          if (_noMoreRooms || _isLoading) {
                             return const SizedBox.shrink();
                           }
                           return Padding(
@@ -539,9 +504,6 @@ class _SpaceViewState extends State<SpaceView> {
                             item.name ??
                             item.canonicalAlias ??
                             L10n.of(context).emptyChat;
-                        if (!displayname.toLowerCase().contains(filter)) {
-                          return const SizedBox.shrink();
-                        }
                         var joinedRoom = room.client.getRoomById(item.roomId);
                         if (joinedRoom?.membership == Membership.leave) {
                           joinedRoom = null;

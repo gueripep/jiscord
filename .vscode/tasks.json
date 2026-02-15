@@ -1,0 +1,41 @@
+{
+      "version": "2.0.0",
+      "tasks": [
+            {
+                  "label": "LiveKit Server (Docker)",
+                  "type": "shell",
+                  "command": "docker run --rm -p 7880:7880 -p 7881:7881 -p 7882:7882/udp livekit/livekit-server --dev --bind 0.0.0.0",
+                  "isBackground": true,
+                  "problemMatcher": [],
+                  "presentation": {
+                        "reveal": "always",
+                        "panel": "dedicated",
+                        "group": "voice"
+                  }
+            },
+            {
+                  "label": "Voice Service (Node)",
+                  "type": "shell",
+                  "command": "npm run dev",
+                  "options": {
+                        "cwd": "${workspaceFolder}/voice-service"
+                  },
+                  "isBackground": true,
+                  "problemMatcher": [],
+                  "presentation": {
+                        "reveal": "always",
+                        "panel": "dedicated",
+                        "group": "voice"
+                  }
+            },
+            {
+                  "label": "Start Voice Services",
+                  "dependsOn": [
+                        "LiveKit Server (Docker)",
+                        "Voice Service (Node)"
+                  ],
+                  "dependsOrder": "parallel",
+                  "problemMatcher": []
+            }
+      ]
+}

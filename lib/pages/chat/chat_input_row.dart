@@ -358,10 +358,7 @@ class ChatInputRow extends StatelessWidget {
                     height: height,
                     width: height,
                     alignment: Alignment.center,
-                    child:
-                        PlatformInfos.platformCanRecord &&
-                                !controller.sendController.text.isNotEmpty ||
-                            controller.editEvent == null
+                    child: !textMessageOnly
                         ? IconButton(
                             tooltip: L10n.of(context).voiceMessage,
                             onPressed: () =>

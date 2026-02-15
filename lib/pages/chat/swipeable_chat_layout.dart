@@ -119,14 +119,25 @@ class _SwipeableChatLayoutState extends State<SwipeableChatLayout> {
             PointerDeviceKind.trackpad,
           },
         ),
-        child: NotificationListener<SwipeBackNotification>(
+        child: NotificationListener<Notification>(
           onNotification: (notification) {
-            _pageController.animateToPage(
-              0,
-              duration: const Duration(milliseconds: 300),
-              curve: Curves.easeOut,
-            );
-            return true;
+            if (notification is SwipeBackNotification) {
+              _pageController.animateToPage(
+                0,
+                duration: const Duration(milliseconds: 300),
+                curve: Curves.easeOut,
+              );
+              return true;
+            }
+            if (notification is ShowChatNotification) {
+              _pageController.animateToPage(
+                1,
+                duration: const Duration(milliseconds: 300),
+                curve: Curves.easeOut,
+              );
+              return true;
+            }
+            return false;
           },
           child: PageView(
             controller: _pageController,
