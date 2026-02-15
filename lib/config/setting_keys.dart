@@ -29,6 +29,7 @@ enum AppSettings<T> {
     'event_id_only',
   ),
   renderHtml<bool>('chat.fluffy.renderHtml', true),
+  renderUrlPreviews<bool>('chat.fluffy.renderUrlPreviews', true),
   fontSizeFactor<double>('chat.fluffy.font_size_factor', 1.0),
   hideRedactedEvents<bool>('chat.fluffy.hideRedactedEvents', false),
   hideUnknownEvents<bool>('chat.fluffy.hideUnknownEvents', true),
@@ -52,7 +53,9 @@ enum AppSettings<T> {
   // colorSchemeSeed stored as ARGB int
   colorSchemeSeedInt<int>('chat.fluffy.color_scheme_seed', 0xFF5625BA),
   emojiSuggestionLocale<String>('emoji_suggestion_locale', ''),
-  enableSoftLogout<bool>('chat.fluffy.enable_soft_logout', false);
+  enableSoftLogout<bool>('chat.fluffy.enable_soft_logout', false),
+  lastActiveSpace<String>('chat.fluffy.last_active_space', ''),
+  lastActiveChat<String>('chat.fluffy.last_active_chat', '');
 
   final String key;
   final T defaultValue;

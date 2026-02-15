@@ -8,7 +8,6 @@ import 'package:matrix/matrix.dart' as sdk;
 import 'package:matrix/matrix.dart';
 
 import 'package:fluffychat/config/app_config.dart';
-import 'package:fluffychat/config/themes.dart';
 import 'package:fluffychat/l10n/l10n.dart';
 import 'package:fluffychat/pages/chat_list/unread_bubble.dart';
 import 'package:fluffychat/utils/localized_exception_extension.dart';
@@ -23,8 +22,6 @@ import 'package:fluffychat/widgets/avatar.dart';
 import 'package:fluffychat/widgets/future_loading_dialog.dart';
 import 'package:fluffychat/widgets/hover_builder.dart';
 import 'package:fluffychat/widgets/matrix.dart';
-
-enum AddRoomType { chat, subspace }
 
 enum SpaceChildAction { edit, moveToSpace, removeFromSpace }
 
@@ -184,15 +181,11 @@ class _SpaceViewState extends State<SpaceView> {
     }
   }
 
-  void _addChatOrSubspace(AddRoomType roomType) async {
+  void _addChat() async {
     final names = await showTextInputDialog(
       context: context,
-      title: roomType == AddRoomType.subspace
-          ? L10n.of(context).newSubSpace
-          : L10n.of(context).createGroup,
-      hintText: roomType == AddRoomType.subspace
-          ? L10n.of(context).spaceName
-          : L10n.of(context).groupName,
+      title: L10n.of(context).createGroup,
+      hintText: L10n.of(context).groupName,
       minLines: 1,
       maxLines: 1,
       maxLength: 64,
@@ -210,46 +203,36 @@ class _SpaceViewState extends State<SpaceView> {
     final result = await showFutureLoadingDialog(
       context: context,
       future: () async {
-        late final String roomId;
         final activeSpace = client.getRoomById(widget.spaceId)!;
         await activeSpace.postLoad();
         final isPublicSpace = activeSpace.joinRules == JoinRules.public;
 
-        if (roomType == AddRoomType.subspace) {
-          roomId = await client.createSpace(
-            name: names,
-            visibility: isPublicSpace
-                ? sdk.Visibility.public
-                : sdk.Visibility.private,
-          );
-        } else {
-          roomId = await client.createGroupChat(
-            enableEncryption: !isPublicSpace,
-            groupName: names,
-            preset: isPublicSpace
-                ? CreateRoomPreset.publicChat
-                : CreateRoomPreset.privateChat,
-            visibility: isPublicSpace
-                ? sdk.Visibility.public
-                : sdk.Visibility.private,
-            initialState: isPublicSpace
-                ? null
-                : [
-                    StateEvent(
-                      content: {
-                        'join_rule': 'restricted',
-                        'allow': [
-                          {
-                            'room_id': widget.spaceId,
-                            'type': 'm.room_membership',
-                          },
-                        ],
-                      },
-                      type: EventTypes.RoomJoinRules,
-                    ),
-                  ],
-          );
-        }
+        final roomId = await client.createGroupChat(
+          enableEncryption: !isPublicSpace,
+          groupName: names,
+          preset: isPublicSpace
+              ? CreateRoomPreset.publicChat
+              : CreateRoomPreset.privateChat,
+          visibility: isPublicSpace
+              ? sdk.Visibility.public
+              : sdk.Visibility.private,
+          initialState: isPublicSpace
+              ? null
+              : [
+                  StateEvent(
+                    content: {
+                      'join_rule': 'restricted',
+                      'allow': [
+                        {
+                          'room_id': widget.spaceId,
+                          'type': 'm.room_membership',
+                        },
+                      ],
+                    },
+                    type: EventTypes.RoomJoinRules,
+                  ),
+                ],
+        );
         await activeSpace.setSpaceChild(roomId);
       },
     );
@@ -392,13 +375,11 @@ class _SpaceViewState extends State<SpaceView> {
     final isAdmin = room?.canChangeStateEvent(EventTypes.SpaceChild) == true;
     return Scaffold(
       appBar: AppBar(
-        leading: FluffyThemes.isColumnMode(context)
-            ? null
-            : Center(child: CloseButton(onPressed: widget.onBack)),
+        leading: null,
         automaticallyImplyLeading: false,
-        titleSpacing: FluffyThemes.isColumnMode(context) ? null : 0,
+        titleSpacing: 0,
         title: ListTile(
-          contentPadding: EdgeInsets.zero,
+          contentPadding: const EdgeInsets.only(left: 16.0),
           leading: Avatar(
             size: avatarSize,
             mxContent: room?.avatar,
@@ -414,34 +395,10 @@ class _SpaceViewState extends State<SpaceView> {
         ),
         actions: [
           if (isAdmin)
-            PopupMenuButton<AddRoomType>(
-              icon: const Icon(Icons.add_outlined),
-              onSelected: _addChatOrSubspace,
-              tooltip: L10n.of(context).addChatOrSubSpace,
-              itemBuilder: (context) => [
-                PopupMenuItem(
-                  value: AddRoomType.chat,
-                  child: Row(
-                    mainAxisSize: .min,
-                    children: [
-                      const Icon(Icons.group_add_outlined),
-                      const SizedBox(width: 12),
-                      Text(L10n.of(context).newGroup),
-                    ],
-                  ),
-                ),
-                PopupMenuItem(
-                  value: AddRoomType.subspace,
-                  child: Row(
-                    mainAxisSize: .min,
-                    children: [
-                      const Icon(Icons.workspaces_outlined),
-                      const SizedBox(width: 12),
-                      Text(L10n.of(context).newSubSpace),
-                    ],
-                  ),
-                ),
-              ],
+            IconButton(
+              onPressed: _addChat,
+              icon: const Icon(Icons.group_add_outlined),
+              tooltip: L10n.of(context).newGroup,
             ),
           PopupMenuButton<SpaceActions>(
             useRootNavigator: true,

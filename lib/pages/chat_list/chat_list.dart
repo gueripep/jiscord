@@ -89,15 +89,13 @@ class ChatListController extends State<ChatList>
 
   void setActiveSpace(String spaceId) async {
     await Matrix.of(context).client.getRoomById(spaceId)!.postLoad();
-
-    setState(() {
-      _activeSpaceId = spaceId;
-    });
+    if (!mounted) return;
+    context.go(
+      Uri(path: '/rooms', queryParameters: {'spaceId': spaceId}).toString(),
+    );
   }
 
-  void clearActiveSpace() => setState(() {
-    _activeSpaceId = null;
-  });
+  void clearActiveSpace() => context.go('/rooms');
 
   void onChatTap(Room room) async {
     if (room.membership == Membership.invite) {
@@ -133,7 +131,16 @@ class ChatListController extends State<ChatList>
       return;
     }
 
-    context.go('/rooms/${room.id}');
+    final queryParameters = <String, String>{};
+    if (activeSpaceId != null) {
+      queryParameters['spaceId'] = activeSpaceId!;
+    }
+    context.go(
+      Uri(
+        path: '/rooms/${room.id}',
+        queryParameters: queryParameters,
+      ).toString(),
+    );
   }
 
   bool Function(Room) getRoomFilterByActiveFilter(ActiveFilter activeFilter) {
@@ -374,13 +381,14 @@ class ChatListController extends State<ChatList>
 
   @override
   void initState() {
-    activeFilter = ActiveFilter.spaces;
+    activeFilter = ActiveFilter.messages;
     _initReceiveSharingIntent();
     _activeSpaceId = widget.activeSpace;
 
     scrollController.addListener(_onScroll);
     _waitForFirstSync();
     _hackyWebRTCFixForWeb();
+    _savePersistentState();
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (mounted) {
         searchServer = Matrix.of(
@@ -397,6 +405,20 @@ class ChatListController extends State<ChatList>
     });
 
     super.initState();
+  }
+
+  @override
+  void didUpdateWidget(ChatList oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.activeChat != widget.activeChat ||
+        oldWidget.activeSpace != widget.activeSpace) {
+      _savePersistentState();
+    }
+  }
+
+  void _savePersistentState() {
+    AppSettings.lastActiveChat.setItem(widget.activeChat ?? '');
+    AppSettings.lastActiveSpace.setItem(widget.activeSpace ?? '');
   }
 
   @override

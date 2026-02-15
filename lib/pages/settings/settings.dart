@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:matrix/matrix.dart';
 
+import 'package:fluffychat/config/setting_keys.dart';
 import 'package:fluffychat/l10n/l10n.dart';
 import 'package:fluffychat/utils/file_selector.dart';
 import 'package:fluffychat/utils/platform_infos.dart';
@@ -75,6 +76,8 @@ class SettingsController extends State<Settings> {
       return;
     }
     final matrix = Matrix.of(context);
+    AppSettings.lastActiveChat.setItem('');
+    AppSettings.lastActiveSpace.setItem('');
     await showFutureLoadingDialog(
       context: context,
       future: () => matrix.client.logout(),

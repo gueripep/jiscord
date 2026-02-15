@@ -23,8 +23,11 @@ import 'audio_player.dart';
 import 'cute_events.dart';
 import 'html_message.dart';
 import 'image_bubble.dart';
+import 'package:flutter_linkify/flutter_linkify.dart';
+import 'package:linkify/linkify.dart';
 import 'map_bubble.dart';
 import 'message_download_content.dart';
+import '../../../widgets/url_preview.dart';
 
 class MessageContent extends StatelessWidget {
   final Event event;
@@ -261,29 +264,54 @@ class MessageContent extends StatelessWidget {
                 event.numberEmotes <= 3;
             return Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: HtmlMessage(
-                html: html,
-                textColor: textColor,
-                room: event.room,
-                fontSize:
-                    AppSettings.fontSizeFactor.value *
-                    AppConfig.messageFontSize *
-                    (bigEmotes ? 5 : 1),
-                limitHeight: !selected,
-                linkStyle: TextStyle(
-                  color: linkColor,
-                  fontSize:
-                      AppSettings.fontSizeFactor.value *
-                      AppConfig.messageFontSize,
-                  decoration: TextDecoration.underline,
-                  decorationColor: linkColor,
-                ),
-                onOpen: (url) => UrlLauncher(context, url.url).launchUrl(),
-                eventId: event.eventId,
-                checkboxCheckedEvents: event.aggregatedEvents(
-                  timeline,
-                  EventCheckboxRoomExtension.relationshipType,
-                ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  HtmlMessage(
+                    html: html,
+                    textColor: textColor,
+                    room: event.room,
+                    fontSize:
+                        AppSettings.fontSizeFactor.value *
+                        AppConfig.messageFontSize *
+                        (bigEmotes ? 5 : 1),
+                    limitHeight: !selected,
+                    linkStyle: TextStyle(
+                      color: linkColor,
+                      fontSize:
+                          AppSettings.fontSizeFactor.value *
+                          AppConfig.messageFontSize,
+                      decoration: TextDecoration.underline,
+                      decorationColor: linkColor,
+                    ),
+                    onOpen: (url) => UrlLauncher(context, url.url).launchUrl(),
+                    eventId: event.eventId,
+                    checkboxCheckedEvents: event.aggregatedEvents(
+                      timeline,
+                      EventCheckboxRoomExtension.relationshipType,
+                    ),
+                  ),
+                  if (AppSettings.renderUrlPreviews.value)
+                    ...linkify(
+                          event.body,
+                          options: const LinkifyOptions(humanize: false),
+                          linkifiers: [
+                            const EmailLinkifier(),
+                            const UrlLinkifier(),
+                          ],
+                        )
+                        .whereType<LinkableElement>()
+                        .map((e) => e.url)
+                        .take(1) // Only show preview for the first URL
+                        .map(
+                          (url) => UrlPreview(
+                            url: url,
+                            textColor: textColor,
+                            borderRadius:
+                                borderRadius.topLeft.x, // Use same radius style
+                          ),
+                        ),
+                ],
               ),
             );
         }

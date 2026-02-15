@@ -7,6 +7,7 @@ import 'package:desktop_drop/desktop_drop.dart';
 import 'package:matrix/matrix.dart';
 
 import 'package:fluffychat/config/setting_keys.dart';
+import 'package:fluffychat/pages/chat/swipe_notifications.dart';
 import 'package:fluffychat/config/themes.dart';
 import 'package:fluffychat/l10n/l10n.dart';
 import 'package:fluffychat/pages/chat/chat.dart';
@@ -233,7 +234,19 @@ class ChatView extends StatelessWidget {
                         builder: (context, _) => UnreadRoomsBadge(
                           filter: (r) => r.id != controller.roomId,
                           badgePosition: BadgePosition.topEnd(end: 8, top: 4),
-                          child: const Center(child: BackButton()),
+                          child: Center(
+                            child: BackButton(
+                              onPressed: () {
+                                if (FluffyThemes.isColumnMode(context)) {
+                                  Navigator.of(context).pop();
+                                } else {
+                                  const SwipeBackNotification().dispatch(
+                                    context,
+                                  );
+                                }
+                              },
+                            ),
+                          ),
                         ),
                       ),
                 titleSpacing: FluffyThemes.isColumnMode(context) ? 24 : 0,

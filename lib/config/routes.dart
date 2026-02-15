@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:matrix/matrix.dart';
 
 import 'package:fluffychat/config/themes.dart';
+import 'package:fluffychat/config/setting_keys.dart';
 import 'package:fluffychat/pages/archive/archive.dart';
 import 'package:fluffychat/pages/bootstrap/bootstrap_dialog.dart';
 import 'package:fluffychat/pages/chat/chat.dart';
@@ -13,6 +14,7 @@ import 'package:fluffychat/pages/chat_access_settings/chat_access_settings_contr
 import 'package:fluffychat/pages/chat_details/chat_details.dart';
 import 'package:fluffychat/pages/chat_encryption_settings/chat_encryption_settings.dart';
 import 'package:fluffychat/pages/chat_list/chat_list.dart';
+import 'package:fluffychat/pages/chat/swipeable_chat_layout.dart';
 import 'package:fluffychat/pages/chat_members/chat_members.dart';
 import 'package:fluffychat/pages/chat_permissions_settings/chat_permissions_settings.dart';
 import 'package:fluffychat/pages/chat_search/chat_search_page.dart';
@@ -60,10 +62,28 @@ abstract class AppRoutes {
   static final List<RouteBase> routes = [
     GoRoute(
       path: '/',
-      redirect: (context, state) =>
-          Matrix.of(context).widget.clients.any((client) => client.isLogged())
-          ? '/rooms'
-          : '/home',
+      redirect: (context, state) {
+        if (!Matrix.of(
+          context,
+        ).widget.clients.any((client) => client.isLogged())) {
+          return '/home';
+        }
+        final lastChat = AppSettings.lastActiveChat.value;
+        final lastSpace = AppSettings.lastActiveSpace.value;
+        if (lastChat.isNotEmpty) {
+          return Uri(
+            path: '/rooms/$lastChat',
+            queryParameters: lastSpace.isEmpty ? {} : {'spaceId': lastSpace},
+          ).toString();
+        }
+        if (lastSpace.isNotEmpty) {
+          return Uri(
+            path: '/rooms',
+            queryParameters: {'spaceId': lastSpace},
+          ).toString();
+        }
+        return '/rooms';
+      },
     ),
     GoRoute(
       path: '/home',
@@ -117,36 +137,49 @@ abstract class AppRoutes {
       // Never use a transition on the shell route. Changing the PageBuilder
       // here based on a MediaQuery causes the child to briefly be rendered
       // twice with the same GlobalKey, blowing up the rendering.
-      pageBuilder: (context, state, child) => noTransitionPageBuilder(
-        context,
-        state,
-        FluffyThemes.isColumnMode(context) &&
-                state.fullPath?.startsWith('/rooms/settings') == false
-            ? TwoColumnLayout(
+      pageBuilder: (context, state, child) {
+        final isSettings =
+            state.fullPath?.startsWith('/rooms/settings') == true;
+        final isColumnMode = FluffyThemes.isColumnMode(context);
+
+        if (isColumnMode) {
+          if (!isSettings) {
+            return noTransitionPageBuilder(
+              context,
+              state,
+              TwoColumnLayout(
                 mainView: ChatList(
                   activeChat: state.pathParameters['roomid'],
                   activeSpace: state.uri.queryParameters['spaceId'],
-                  displayNavigationRail:
-                      state.path?.startsWith('/rooms/settings') != true,
+                  displayNavigationRail: true,
                 ),
                 sideView: child,
-              )
-            : child,
-      ),
+              ),
+            );
+          }
+          return noTransitionPageBuilder(context, state, child);
+        }
+
+        // Mobile / Swipeable mode
+        if (!isSettings) {
+          return noTransitionPageBuilder(
+            context,
+            state,
+            SwipeableChatLayout(
+              roomId: state.pathParameters['roomid'] ?? '',
+              chatPage: child,
+              spaceId: state.uri.queryParameters['spaceId'],
+            ),
+          );
+        }
+        return noTransitionPageBuilder(context, state, child);
+      },
       routes: [
         GoRoute(
           path: '/rooms',
           redirect: loggedOutRedirect,
-          pageBuilder: (context, state) => defaultPageBuilder(
-            context,
-            state,
-            FluffyThemes.isColumnMode(context)
-                ? const EmptyPage()
-                : ChatList(
-                    activeChat: state.pathParameters['roomid'],
-                    activeSpace: state.uri.queryParameters['spaceId'],
-                  ),
-          ),
+          pageBuilder: (context, state) =>
+              defaultPageBuilder(context, state, const EmptyPage()),
           routes: [
             GoRoute(
               path: 'archive',
