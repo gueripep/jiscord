@@ -7,6 +7,7 @@ import 'package:html/dom.dart' as dom;
 import 'package:url_launcher/url_launcher.dart';
 import 'package:video_player/video_player.dart';
 import 'package:chewie/chewie.dart';
+import 'package:fluffychat/config/setting_keys.dart';
 
 class UrlPreview extends StatefulWidget {
   final String url;
@@ -57,6 +58,20 @@ class _UrlPreviewState extends State<UrlPreview> {
       final uri = Uri.tryParse(widget.url);
       if (uri == null || !['http', 'https'].contains(uri.scheme)) {
         return null; // Don't try to fetch non-http URLs
+      }
+
+      // Check persistent cache
+      final storedJson = AppSettings.store.getString(
+        'url_preview_cache_${widget.url}',
+      );
+      if (storedJson != null) {
+        try {
+          final metadata = LinkMetadata.fromJson(jsonDecode(storedJson));
+          _cache[widget.url] = metadata;
+          return metadata;
+        } catch (e) {
+          debugPrint('Error decoding cached metadata: $e');
+        }
       }
 
       // Special handling for Twitter/X and proxies (fxtwitter, vxtwitter, fixupx, etc.)
@@ -135,7 +150,7 @@ class _UrlPreviewState extends State<UrlPreview> {
                 url: widget.url,
                 themeColor: const Color(0xFF1DA1F2), // Twitter Blue
               );
-              _cache[widget.url] = metadata;
+              _saveToCache(metadata);
               return metadata;
             }
           }
@@ -182,7 +197,7 @@ class _UrlPreviewState extends State<UrlPreview> {
                   url: widget.url,
                   themeColor: const Color(0xFFE4405F), // Insta pink/red
                 );
-                _cache[widget.url] = finalMetadata;
+                _saveToCache(finalMetadata);
                 return finalMetadata;
               }
             }
@@ -214,7 +229,7 @@ class _UrlPreviewState extends State<UrlPreview> {
 
         // Only cache if we found at least a title or image
         if (metadata != null) {
-          _cache[widget.url] = metadata;
+          _saveToCache(metadata);
         }
         return metadata;
       }
@@ -223,6 +238,14 @@ class _UrlPreviewState extends State<UrlPreview> {
     }
 
     return null;
+  }
+
+  void _saveToCache(LinkMetadata metadata) {
+    _cache[widget.url] = metadata;
+    AppSettings.store.setString(
+      'url_preview_cache_${widget.url}',
+      jsonEncode(metadata.toJson()),
+    );
   }
 
   LinkMetadata? _extractMetadata(dom.Document document, Uri baseUrl) {
@@ -515,4 +538,28 @@ class LinkMetadata {
     this.themeColor,
     required this.url,
   });
+
+  Map<String, dynamic> toJson() {
+    return {
+      'title': title,
+      'description': description,
+      'imageUrl': imageUrl,
+      'videoUrl': videoUrl,
+      'siteName': siteName,
+      'themeColor': themeColor?.value,
+      'url': url,
+    };
+  }
+
+  factory LinkMetadata.fromJson(Map<String, dynamic> json) {
+    return LinkMetadata(
+      title: json['title'],
+      description: json['description'],
+      imageUrl: json['imageUrl'],
+      videoUrl: json['videoUrl'],
+      siteName: json['siteName'],
+      themeColor: json['themeColor'] != null ? Color(json['themeColor']) : null,
+      url: json['url'] ?? '',
+    );
+  }
 }
