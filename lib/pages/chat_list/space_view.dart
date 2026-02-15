@@ -22,6 +22,9 @@ import 'package:fluffychat/widgets/avatar.dart';
 import 'package:fluffychat/widgets/future_loading_dialog.dart';
 import 'package:fluffychat/widgets/hover_builder.dart';
 import 'package:fluffychat/widgets/matrix.dart';
+import 'package:fluffychat/utils/voice/voice_channel_model.dart';
+import 'package:fluffychat/widgets/voice_channel_tile.dart';
+import 'package:fluffychat/pages/voice_channel/voice_channel_dialog.dart';
 
 enum SpaceChildAction { edit, moveToSpace, removeFromSpace }
 
@@ -400,6 +403,18 @@ class _SpaceViewState extends State<SpaceView> {
               icon: const Icon(Icons.group_add_outlined),
               tooltip: L10n.of(context).newGroup,
             ),
+          if (isAdmin)
+            IconButton(
+              onPressed: () async {
+                final result = await VoiceChannelDialog.show(
+                  context,
+                  room: room!,
+                );
+                if (result == true) setState(() {});
+              },
+              icon: const Icon(Icons.volume_up),
+              tooltip: 'Create Voice Channel',
+            ),
           PopupMenuButton<SpaceActions>(
             useRootNavigator: true,
             onSelected: _onSpaceAction,
@@ -630,6 +645,66 @@ class _SpaceViewState extends State<SpaceView> {
                           ),
                         );
                       },
+                    ),
+                    SliverToBoxAdapter(
+                      child: FutureBuilder<List<VoiceChannel>>(
+                        future: VoiceChannel.fetchFromRoom(room),
+                        builder: (context, snapshot) {
+                          final voiceChannels = snapshot.data ?? [];
+                          if (voiceChannels.isEmpty && !isAdmin) {
+                            return const SizedBox.shrink();
+                          }
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 8,
+                                ),
+                                child: Row(
+                                  children: [
+                                    Text(
+                                      'VOICE CHANNELS',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                        letterSpacing: 0.5,
+                                        color: theme.colorScheme.onSurface
+                                            .withValues(alpha: 0.5),
+                                      ),
+                                    ),
+                                    const Spacer(),
+                                    if (isAdmin)
+                                      InkWell(
+                                        onTap: () async {
+                                          final result =
+                                              await VoiceChannelDialog.show(
+                                                context,
+                                                room: room,
+                                              );
+                                          if (result == true) {
+                                            setState(() {});
+                                          }
+                                        },
+                                        borderRadius: BorderRadius.circular(12),
+                                        child: Icon(
+                                          Icons.add,
+                                          size: 16,
+                                          color: theme.colorScheme.onSurface
+                                              .withValues(alpha: 0.5),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                              ...voiceChannels.map(
+                                (ch) => VoiceChannelTile(channel: ch),
+                              ),
+                            ],
+                          );
+                        },
+                      ),
                     ),
                     const SliverPadding(padding: EdgeInsets.only(top: 32)),
                   ],

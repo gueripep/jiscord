@@ -16,7 +16,7 @@ const channelParticipants = new Map<string, Map<string, Participant>>();
 /**
  * Generate a LiveKit access token for a user to join a specific voice channel.
  */
-export function generateToken(channelId: string, userId: string, displayName: string): string {
+export async function generateToken(channelId: string, userId: string, displayName: string): Promise<string> {
       const token = new AccessToken(config.livekit.apiKey, config.livekit.apiSecret, {
             identity: userId,
             name: displayName,
@@ -31,7 +31,7 @@ export function generateToken(channelId: string, userId: string, displayName: st
             canPublishData: true,
       });
 
-      return token.toJwt();
+      return await token.toJwt();
 }
 
 /**

@@ -31,6 +31,7 @@ class VoiceChannelController extends ChangeNotifier {
   bool _isMuted = false;
   bool _isDeafened = false;
   bool _isConnecting = false;
+  bool _isCameraOn = false;
 
   /// Whether the user is currently in a voice channel.
   bool get isConnected => _room != null && _activeChannelId != null;
@@ -53,12 +54,32 @@ class VoiceChannelController extends ChangeNotifier {
   /// Whether the local user is deafened.
   bool get isDeafened => _isDeafened;
 
+  /// Whether the local user's camera is on.
+  bool get isCameraOn => _isCameraOn;
+
   /// All remote participants in the current voice channel.
   List<lk.RemoteParticipant> get remoteParticipants =>
       _room?.remoteParticipants.values.toList() ?? [];
 
   /// Total participant count including local user.
   int get participantCount => isConnected ? remoteParticipants.length + 1 : 0;
+
+  /// Get the local video track (if camera is on).
+  lk.LocalVideoTrack? get localVideoTrack {
+    if (_localParticipant == null) return null;
+    for (final pub in _localParticipant!.videoTrackPublications) {
+      if (pub.track is lk.LocalVideoTrack) {
+        return pub.track as lk.LocalVideoTrack;
+      }
+    }
+    return null;
+  }
+
+  /// Get the local participant reference.
+  lk.LocalParticipant? get localParticipant => _localParticipant;
+
+  /// Get the LiveKit room reference.
+  lk.Room? get room => _room;
 
   // --- Actions ---
 
@@ -122,6 +143,7 @@ class VoiceChannelController extends ChangeNotifier {
       _activeRoomId = roomId;
       _isMuted = false;
       _isDeafened = false;
+      _isCameraOn = false;
 
       Logs().i('[Voice] Joined channel: $channelName ($channelId)');
     } catch (e, s) {
@@ -153,6 +175,7 @@ class VoiceChannelController extends ChangeNotifier {
     _activeRoomId = null;
     _isMuted = false;
     _isDeafened = false;
+    _isCameraOn = false;
 
     Logs().i('[Voice] Left channel: $channelName');
     notifyListeners();
@@ -196,6 +219,15 @@ class VoiceChannelController extends ChangeNotifier {
       await _localParticipant?.setMicrophoneEnabled(true);
     }
 
+    notifyListeners();
+  }
+
+  /// Toggle camera on/off.
+  Future<void> toggleCamera() async {
+    if (!isConnected || _localParticipant == null) return;
+
+    _isCameraOn = !_isCameraOn;
+    await _localParticipant!.setCameraEnabled(_isCameraOn);
     notifyListeners();
   }
 

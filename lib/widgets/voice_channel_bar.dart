@@ -113,6 +113,18 @@ class VoiceChannelBar extends StatelessWidget {
                 ),
                 const SizedBox(width: 4),
                 _ControlButton(
+                  icon: controller.isCameraOn
+                      ? Icons.videocam
+                      : Icons.videocam_off,
+                  isActive: controller.isCameraOn,
+                  activeColor: theme.colorScheme.primary,
+                  onPressed: controller.toggleCamera,
+                  tooltip: controller.isCameraOn
+                      ? 'Turn Off Camera'
+                      : 'Turn On Camera',
+                ),
+                const SizedBox(width: 4),
+                _ControlButton(
                   icon: Icons.call_end,
                   isActive: true,
                   activeColor: Colors.red,
@@ -150,22 +162,17 @@ class _ControlButton extends StatelessWidget {
         ? (activeColor ?? theme.colorScheme.error)
         : theme.colorScheme.onSurface;
 
-    return Tooltip(
-      message: tooltip,
-      child: InkWell(
-        onTap: onPressed,
-        borderRadius: BorderRadius.circular(20),
-        child: Container(
-          width: 36,
-          height: 36,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: isActive
-                ? color.withValues(alpha: 0.15)
-                : Colors.transparent,
-          ),
-          child: Icon(icon, size: 20, color: color),
+    return InkWell(
+      onTap: onPressed,
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        width: 36,
+        height: 36,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: isActive ? color.withValues(alpha: 0.15) : Colors.transparent,
         ),
+        child: Icon(icon, size: 20, color: color),
       ),
     );
   }

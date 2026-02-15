@@ -11,7 +11,7 @@ const router = Router();
  *
  * Returns a LiveKit JWT token for joining the specified voice channel.
  */
-router.post('/', authMiddleware, (req: Request, res: Response) => {
+router.post('/', authMiddleware, async (req: Request, res: Response) => {
       const { channelId, displayName } = req.body;
       const userId = (req as any).matrixUserId as string;
 
@@ -21,7 +21,7 @@ router.post('/', authMiddleware, (req: Request, res: Response) => {
       }
 
       const name = displayName || userId;
-      const token = generateToken(channelId, userId, name);
+      const token = await generateToken(channelId, userId, name);
 
       res.json({
             token,

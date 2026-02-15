@@ -9,7 +9,7 @@ const router = Router();
  * No auth required — participant lists are public within the app.
  */
 router.get('/:channelId', (req: Request, res: Response) => {
-      const { channelId } = req.params;
+      const channelId = req.params.channelId as string;
       const participants = getParticipants(channelId);
 
       res.json({

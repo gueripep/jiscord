@@ -67,7 +67,7 @@ class FluffyChatApp extends StatelessWidget {
             child: Column(
               children: [
                 Expanded(child: testWidget ?? child ?? const SizedBox.shrink()),
-                const VoiceChannelBar(),
+                const Material(child: VoiceChannelBar()),
               ],
             ),
           ),

@@ -53,7 +53,8 @@ class VoiceChannel {
   /// The Matrix event type for voice channel state events.
   static const String eventType = 'com.jiscord.voice_channel';
 
-  /// Extract all voice channels from a Matrix room's state.
+  /// Extract all voice channels from a Matrix room's local state cache.
+  /// Use [fetchFromRoom] for a reliable server-side fetch.
   static List<VoiceChannel> fromRoom(Room room) {
     final stateMap = room.states[eventType];
     if (stateMap == null) return [];
@@ -68,6 +69,49 @@ class VoiceChannel {
           ),
         )
         .toList();
+  }
+
+  /// Fetch voice channels from the Matrix server (not just local cache).
+  ///
+  /// This is needed because custom state events may not be in the
+  /// initial sync / local database. Falls back to local cache on error.
+  static Future<List<VoiceChannel>> fetchFromRoom(Room room) async {
+    try {
+      // First check local cache
+      final local = fromRoom(room);
+      if (local.isNotEmpty) return local;
+
+      // Fetch full room state from the server
+      final stateEvents = await room.client.getRoomState(room.id);
+
+      // Filter for our custom voice channel events
+      final voiceEvents = stateEvents
+          .where((e) => e.type == eventType)
+          .toList();
+
+      if (voiceEvents.isEmpty) return [];
+
+      // Inject into local cache so subsequent reads work
+      for (final event in voiceEvents) {
+        room.setState(
+          Event(
+            type: event.type,
+            stateKey: event.stateKey,
+            content: event.content,
+            eventId: event.eventId,
+            senderId: event.senderId,
+            originServerTs: event.originServerTs,
+            room: room,
+          ),
+        );
+      }
+
+      // Now read from local cache (which we just populated)
+      return fromRoom(room);
+    } catch (e) {
+      Logs().w('[Voice] Failed to fetch voice channels from server: $e');
+      return fromRoom(room);
+    }
   }
 }
 

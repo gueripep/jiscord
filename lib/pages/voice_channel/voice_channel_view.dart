@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 
+import 'package:livekit_client/livekit_client.dart' as lk;
+
 import 'package:fluffychat/utils/voice/voice_channel_controller.dart';
 import 'package:fluffychat/widgets/matrix.dart';
 
 /// Full-screen expanded view of the current voice channel.
 ///
-/// Shows all participants with speaking indicators and
-/// provides mute/deafen/leave controls.
+/// Shows all participants with speaking indicators, video feeds when
+/// cameras are on, and provides mute/deafen/camera/leave controls.
 class VoiceChannelView extends StatelessWidget {
   const VoiceChannelView({super.key});
 
@@ -28,7 +30,9 @@ class VoiceChannelView extends StatelessWidget {
   }
 
   Widget _buildView(BuildContext context, VoiceChannelController controller) {
-    final theme = Theme.of(context);
+    final hasAnyVideo =
+        controller.isCameraOn ||
+        controller.remoteParticipants.any((p) => p.isCameraEnabled());
 
     return Scaffold(
       appBar: AppBar(
@@ -44,98 +48,217 @@ class VoiceChannelView extends StatelessWidget {
       ),
       body: Column(
         children: [
-          // Participant grid
+          // Participant area — video grid or audio-only list
           Expanded(
-            child: controller.participantCount == 0
-                ? Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.volume_off,
-                          size: 48,
-                          color: theme.colorScheme.onSurface.withValues(
-                            alpha: 0.3,
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          'No one else is here',
-                          style: TextStyle(
-                            color: theme.colorScheme.onSurface.withValues(
-                              alpha: 0.5,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  )
-                : ListView(
-                    padding: const EdgeInsets.all(16),
-                    children: [
-                      // Local user
-                      _ParticipantCard(
-                        displayName: 'You',
-                        isSpeaking: false,
-                        isMuted: controller.isMuted,
-                        isLocal: true,
-                      ),
-                      // Remote participants
-                      ...controller.remoteParticipants.map(
-                        (p) => _ParticipantCard(
-                          displayName: p.name.isNotEmpty ? p.name : p.identity,
-                          isSpeaking: p.isSpeaking,
-                          isMuted: !p.isMicrophoneEnabled(),
-                          isLocal: false,
-                        ),
-                      ),
-                    ],
-                  ),
+            child: hasAnyVideo
+                ? _VideoGrid(controller: controller)
+                : _AudioOnlyList(controller: controller),
           ),
           // Controls bar
-          Container(
-            padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.surfaceContainerHigh,
-              border: Border(
-                top: BorderSide(
-                  color: theme.colorScheme.outlineVariant.withValues(
-                    alpha: 0.3,
-                  ),
-                ),
+          _ControlsBar(controller: controller),
+        ],
+      ),
+    );
+  }
+}
+
+/// Audio-only participant list (no video tracks active).
+class _AudioOnlyList extends StatelessWidget {
+  final VoiceChannelController controller;
+
+  const _AudioOnlyList({required this.controller});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    if (controller.participantCount == 0) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.volume_off,
+              size: 48,
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.3),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'No one else is here',
+              style: TextStyle(
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
               ),
             ),
-            child: SafeArea(
-              top: false,
+          ],
+        ),
+      );
+    }
+
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        _ParticipantCard(
+          displayName: 'You',
+          isSpeaking: false,
+          isMuted: controller.isMuted,
+          isLocal: true,
+        ),
+        ...controller.remoteParticipants.map(
+          (p) => _ParticipantCard(
+            displayName: p.name.isNotEmpty ? p.name : p.identity,
+            isSpeaking: p.isSpeaking,
+            isMuted: !p.isMicrophoneEnabled(),
+            isLocal: false,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Video grid layout — shows video tiles for participants with cameras on,
+/// and small audio-only indicators for those without.
+class _VideoGrid extends StatelessWidget {
+  final VoiceChannelController controller;
+
+  const _VideoGrid({required this.controller});
+
+  @override
+  Widget build(BuildContext context) {
+    final tiles = <Widget>[];
+
+    // Local participant tile
+    if (controller.isCameraOn && controller.localVideoTrack != null) {
+      tiles.add(
+        _VideoTile(
+          displayName: 'You',
+          isSpeaking: false,
+          isMuted: controller.isMuted,
+          isLocal: true,
+          videoTrack: controller.localVideoTrack!,
+        ),
+      );
+    } else {
+      tiles.add(
+        _ParticipantCard(
+          displayName: 'You',
+          isSpeaking: false,
+          isMuted: controller.isMuted,
+          isLocal: true,
+        ),
+      );
+    }
+
+    // Remote participant tiles
+    for (final participant in controller.remoteParticipants) {
+      final videoTrack = _getRemoteVideoTrack(participant);
+      final name = participant.name.isNotEmpty
+          ? participant.name
+          : participant.identity;
+
+      if (videoTrack != null) {
+        tiles.add(
+          _VideoTile(
+            displayName: name,
+            isSpeaking: participant.isSpeaking,
+            isMuted: !participant.isMicrophoneEnabled(),
+            isLocal: false,
+            videoTrack: videoTrack,
+          ),
+        );
+      } else {
+        tiles.add(
+          _ParticipantCard(
+            displayName: name,
+            isSpeaking: participant.isSpeaking,
+            isMuted: !participant.isMicrophoneEnabled(),
+            isLocal: false,
+          ),
+        );
+      }
+    }
+
+    // Adaptive grid: 1 col for 1-2, 2 cols for 3+
+    final crossAxisCount = tiles.length <= 2 ? 1 : 2;
+
+    return GridView.count(
+      crossAxisCount: crossAxisCount,
+      padding: const EdgeInsets.all(8),
+      mainAxisSpacing: 8,
+      crossAxisSpacing: 8,
+      childAspectRatio: crossAxisCount == 1 ? 16 / 9 : 4 / 3,
+      children: tiles,
+    );
+  }
+
+  lk.VideoTrack? _getRemoteVideoTrack(lk.RemoteParticipant participant) {
+    for (final pub in participant.videoTrackPublications) {
+      if (pub.subscribed && pub.track is lk.VideoTrack) {
+        return pub.track as lk.VideoTrack;
+      }
+    }
+    return null;
+  }
+}
+
+/// A single video tile showing a participant's camera feed.
+class _VideoTile extends StatelessWidget {
+  final String displayName;
+  final bool isSpeaking;
+  final bool isMuted;
+  final bool isLocal;
+  final lk.VideoTrack videoTrack;
+
+  const _VideoTile({
+    required this.displayName,
+    required this.isSpeaking,
+    required this.isMuted,
+    required this.isLocal,
+    required this.videoTrack,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        border: isSpeaking
+            ? Border.all(color: Colors.green, width: 2)
+            : Border.all(color: theme.colorScheme.outlineVariant, width: 1),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          // Video feed
+          lk.VideoTrackRenderer(videoTrack),
+          // Name overlay
+          Positioned(
+            left: 8,
+            bottom: 8,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.black54,
+                borderRadius: BorderRadius.circular(8),
+              ),
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  _LargeControlButton(
-                    icon: controller.isMuted ? Icons.mic_off : Icons.mic,
-                    label: controller.isMuted ? 'Unmute' : 'Mute',
-                    isActive: controller.isMuted,
-                    onPressed: controller.toggleMute,
+                  Text(
+                    displayName,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
-                  const SizedBox(width: 24),
-                  _LargeControlButton(
-                    icon: controller.isDeafened
-                        ? Icons.headset_off
-                        : Icons.headset,
-                    label: controller.isDeafened ? 'Undeafen' : 'Deafen',
-                    isActive: controller.isDeafened,
-                    onPressed: controller.toggleDeafen,
-                  ),
-                  const SizedBox(width: 24),
-                  _LargeControlButton(
-                    icon: Icons.call_end,
-                    label: 'Leave',
-                    isActive: true,
-                    activeColor: Colors.red,
-                    onPressed: () {
-                      controller.leave();
-                      Navigator.of(context).pop();
-                    },
-                  ),
+                  if (isMuted) ...[
+                    const SizedBox(width: 4),
+                    const Icon(Icons.mic_off, size: 14, color: Colors.red),
+                  ],
                 ],
               ),
             ),
@@ -146,6 +269,7 @@ class VoiceChannelView extends StatelessWidget {
   }
 }
 
+/// Audio-only participant card (no camera).
 class _ParticipantCard extends StatelessWidget {
   final String displayName;
   final bool isSpeaking;
@@ -184,7 +308,6 @@ class _ParticipantCard extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         child: Row(
           children: [
-            // Avatar
             Container(
               width: 40,
               height: 40,
@@ -222,6 +345,70 @@ class _ParticipantCard extends StatelessWidget {
                 size: 18,
                 color: theme.colorScheme.error.withValues(alpha: 0.7),
               ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Controls bar at the bottom of the expanded voice view.
+class _ControlsBar extends StatelessWidget {
+  final VoiceChannelController controller;
+
+  const _ControlsBar({required this.controller});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHigh,
+        border: Border(
+          top: BorderSide(
+            color: theme.colorScheme.outlineVariant.withValues(alpha: 0.3),
+          ),
+        ),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            _LargeControlButton(
+              icon: controller.isMuted ? Icons.mic_off : Icons.mic,
+              label: controller.isMuted ? 'Unmute' : 'Mute',
+              isActive: controller.isMuted,
+              onPressed: controller.toggleMute,
+            ),
+            const SizedBox(width: 24),
+            _LargeControlButton(
+              icon: controller.isDeafened ? Icons.headset_off : Icons.headset,
+              label: controller.isDeafened ? 'Undeafen' : 'Deafen',
+              isActive: controller.isDeafened,
+              onPressed: controller.toggleDeafen,
+            ),
+            const SizedBox(width: 24),
+            _LargeControlButton(
+              icon: controller.isCameraOn ? Icons.videocam : Icons.videocam_off,
+              label: controller.isCameraOn ? 'Camera Off' : 'Camera',
+              isActive: controller.isCameraOn,
+              activeColor: theme.colorScheme.primary,
+              onPressed: controller.toggleCamera,
+            ),
+            const SizedBox(width: 24),
+            _LargeControlButton(
+              icon: Icons.call_end,
+              label: 'Leave',
+              isActive: true,
+              activeColor: Colors.red,
+              onPressed: () {
+                controller.leave();
+                Navigator.of(context).pop();
+              },
+            ),
           ],
         ),
       ),
