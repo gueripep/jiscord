@@ -4,6 +4,7 @@
 
 list(APPEND FLUTTER_PLUGIN_LIST
   app_links
+  connectivity_plus
   desktop_drop
   desktop_webview_window
   dynamic_color
@@ -12,6 +13,7 @@ list(APPEND FLUTTER_PLUGIN_LIST
   flutter_secure_storage_windows
   flutter_webrtc
   geolocator_windows
+  livekit_client
   permission_handler_windows
   record_windows
   screen_retriever_windows

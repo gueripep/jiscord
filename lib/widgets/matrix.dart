@@ -23,6 +23,9 @@ import 'package:fluffychat/utils/matrix_sdk_extensions/matrix_file_extension.dar
 import 'package:fluffychat/utils/platform_infos.dart';
 import 'package:fluffychat/utils/uia_request_manager.dart';
 import 'package:fluffychat/utils/voip_plugin.dart';
+import 'package:fluffychat/utils/voice/voice_channel_controller.dart';
+import 'package:fluffychat/utils/voice/voice_service_api.dart';
+import 'package:fluffychat/config/app_config.dart';
 import 'package:fluffychat/widgets/adaptive_dialogs/show_ok_cancel_alert_dialog.dart';
 import 'package:fluffychat/widgets/fluffy_chat_app.dart';
 import 'package:fluffychat/widgets/future_loading_dialog.dart';
@@ -79,6 +82,9 @@ class MatrixState extends State<Matrix> with WidgetsBindingObserver {
   }
 
   VoipPlugin? voipPlugin;
+
+  /// Voice channel controller for LiveKit-based voice channels.
+  VoiceChannelController? voiceChannelController;
 
   bool get isMultiAccount => widget.clients.length > 1;
 
@@ -342,6 +348,7 @@ class MatrixState extends State<Matrix> with WidgetsBindingObserver {
     }
 
     createVoipPlugin();
+    _initVoiceChannelController();
   }
 
   void createVoipPlugin() async {
@@ -350,6 +357,18 @@ class MatrixState extends State<Matrix> with WidgetsBindingObserver {
       return;
     }
     voipPlugin = VoipPlugin(this);
+  }
+
+  void _initVoiceChannelController() {
+    voiceChannelController?.dispose();
+    final api = VoiceServiceApi(
+      baseUrl: AppConfig.voiceServiceUrl,
+      matrixClient: client,
+    );
+    voiceChannelController = VoiceChannelController(
+      api: api,
+      matrixClient: client,
+    );
   }
 
   @override
@@ -380,6 +399,7 @@ class MatrixState extends State<Matrix> with WidgetsBindingObserver {
     client.httpClient.close();
 
     linuxNotifications?.close();
+    voiceChannelController?.dispose();
 
     super.dispose();
   }

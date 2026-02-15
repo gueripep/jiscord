@@ -59,6 +59,8 @@ abstract class AppConfig {
     path: '/en/privacy',
   );
 
+  static const String voiceServiceUrl = 'http://localhost:3500';
+
   static const String mainIsolatePortName = 'main_isolate';
   static const String pushIsolatePortName = 'push_isolate';
 }

@@ -12,6 +12,7 @@ import 'package:fluffychat/widgets/app_lock.dart';
 import 'package:fluffychat/widgets/theme_builder.dart';
 import '../utils/custom_scroll_behaviour.dart';
 import 'matrix.dart';
+import 'voice_channel_bar.dart';
 
 class FluffyChatApp extends StatelessWidget {
   final Widget? testWidget;
@@ -63,7 +64,12 @@ class FluffyChatApp extends StatelessWidget {
           child: Matrix(
             clients: clients,
             store: store,
-            child: testWidget ?? child,
+            child: Column(
+              children: [
+                Expanded(child: testWidget ?? child ?? const SizedBox.shrink()),
+                const VoiceChannelBar(),
+              ],
+            ),
           ),
         ),
       ),
