@@ -374,7 +374,7 @@ class ChatListController extends State<ChatList>
 
   @override
   void initState() {
-    activeFilter = ActiveFilter.allChats;
+    activeFilter = ActiveFilter.spaces;
     _initReceiveSharingIntent();
     _activeSpaceId = widget.activeSpace;
 

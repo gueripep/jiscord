@@ -164,6 +164,11 @@ abstract class ClientManager {
       settings: const InitializationSettings(
         android: AndroidInitializationSettings('notifications_icon'),
         iOS: DarwinInitializationSettings(),
+        windows: WindowsInitializationSettings(
+          appName: 'FluffyChat',
+          appUserModelId: 'im.fluffychat.fluffychat',
+          guid: 'f9d3b1b0-7e3e-4b1a-9c1a-1a2b3c4d5e6f',
+        ),
       ),
     );
 

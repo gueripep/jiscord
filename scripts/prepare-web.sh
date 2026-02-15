@@ -1,4 +1,4 @@
-#!/bin/sh -ve
+#!/bin/sh
 
 version=$(yq ".dependencies.flutter_vodozemac" < pubspec.yaml)
 version=$(expr "$version" : '\^*\(.*\)')

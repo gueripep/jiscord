@@ -11,6 +11,10 @@ WORKDIR /app
 RUN curl https://sh.rustup.rs -sSf | bash -s -- -y
 ENV PATH="/root/.cargo/bin:${PATH}"
 RUN rustup component add rust-src --toolchain nightly-x86_64-unknown-linux-gnu
+RUN apt-get update && apt-get install -y dos2unix
+RUN dos2unix ./scripts/prepare-web.sh
+RUN chmod +x ./scripts/prepare-web.sh
+RUN cat ./scripts/prepare-web.sh
 RUN ./scripts/prepare-web.sh
 COPY config.* /app/
 RUN flutter pub get

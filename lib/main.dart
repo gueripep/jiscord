@@ -1,6 +1,8 @@
 import 'dart:isolate';
 import 'dart:ui';
+import 'dart:io';
 
+import 'package:path/path.dart' as p;
 import 'package:flutter/material.dart';
 
 import 'package:collection/collection.dart';
@@ -20,6 +22,21 @@ import 'widgets/fluffy_chat_app.dart';
 ReceivePort? mainIsolateReceivePort;
 
 void main() async {
+  if (Platform.isWindows) {
+    // Workaround for sqlcipher_flutter_libs expecting libsqlcipher.dll
+    final exePath = Platform.resolvedExecutable;
+    final exeDir = p.dirname(exePath);
+    final sqlite3Dll = File(p.join(exeDir, 'sqlite3.dll'));
+    final sqlcipherDll = File(p.join(exeDir, 'libsqlcipher.dll'));
+    if (sqlite3Dll.existsSync() && !sqlcipherDll.existsSync()) {
+      try {
+        sqlite3Dll.copySync(sqlcipherDll.path);
+      } catch (e) {
+        stderr.writeln('Failed to copy sqlite3.dll to libsqlcipher.dll: $e');
+      }
+    }
+  }
+
   if (PlatformInfos.isAndroid) {
     final port = mainIsolateReceivePort = ReceivePort();
     IsolateNameServer.removePortNameMapping(AppConfig.mainIsolatePortName);
