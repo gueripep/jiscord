@@ -5,6 +5,26 @@ import 'package:fluffychat/pages/chat_list/chat_list.dart';
 import 'package:fluffychat/pages/chat/swipe_notifications.dart';
 import 'package:fluffychat/widgets/matrix.dart';
 
+class SwipeableChatLayoutTransition extends InheritedWidget {
+  final ValueNotifier<bool> isTransitioning;
+
+  const SwipeableChatLayoutTransition({
+    super.key,
+    required this.isTransitioning,
+    required super.child,
+  });
+
+  static SwipeableChatLayoutTransition? maybeOf(BuildContext context) {
+    return context
+        .dependOnInheritedWidgetOfExactType<SwipeableChatLayoutTransition>();
+  }
+
+  @override
+  bool updateShouldNotify(SwipeableChatLayoutTransition oldWidget) {
+    return isTransitioning != oldWidget.isTransitioning;
+  }
+}
+
 class SwipeableChatLayout extends StatefulWidget {
   final String roomId;
   final Widget chatPage;
@@ -23,6 +43,19 @@ class SwipeableChatLayout extends StatefulWidget {
 
 class _SwipeableChatLayoutState extends State<SwipeableChatLayout> {
   late final PageController _pageController;
+  final ValueNotifier<bool> _isTransitioning = ValueNotifier(false);
+
+  void _pageListener() {
+    if (!_pageController.hasClients) return;
+    final page = _pageController.page;
+    if (page == null) return;
+
+    // We are transitioning if the page is not an integer
+    final isPageTransitioning = page != page.roundToDouble();
+    if (_isTransitioning.value != isPageTransitioning) {
+      _isTransitioning.value = isPageTransitioning;
+    }
+  }
 
   @override
   void initState() {
@@ -32,11 +65,14 @@ class _SwipeableChatLayoutState extends State<SwipeableChatLayout> {
     _pageController = PageController(
       initialPage: widget.roomId.isEmpty ? 0 : 1,
     );
+    _pageController.addListener(_pageListener);
   }
 
   @override
   void dispose() {
+    _pageController.removeListener(_pageListener);
     _pageController.dispose();
+    _isTransitioning.dispose();
     super.dispose();
   }
 
@@ -111,46 +147,49 @@ class _SwipeableChatLayoutState extends State<SwipeableChatLayout> {
           context.pop();
         }
       },
-      child: ScrollConfiguration(
-        behavior: ScrollConfiguration.of(context).copyWith(
-          dragDevices: {
-            PointerDeviceKind.touch,
-            PointerDeviceKind.mouse,
-            PointerDeviceKind.trackpad,
-          },
-        ),
-        child: NotificationListener<Notification>(
-          onNotification: (notification) {
-            if (notification is SwipeBackNotification) {
-              _pageController.animateToPage(
-                0,
-                duration: const Duration(milliseconds: 300),
-                curve: Curves.easeOut,
-              );
-              return true;
-            }
-            if (notification is ShowChatNotification) {
-              _pageController.animateToPage(
-                1,
-                duration: const Duration(milliseconds: 300),
-                curve: Curves.easeOut,
-              );
-              return true;
-            }
-            return false;
-          },
-          child: PageView(
-            controller: _pageController,
-            physics: const BouncingScrollPhysics(),
-            children: [
-              ChatList(
-                key: ValueKey('swipeable_chat_list_${spaceId ?? 'all'}'),
-                activeChat: widget.roomId.isEmpty ? null : widget.roomId,
-                activeSpace: spaceId,
-                displayNavigationRail: true,
-              ),
-              widget.chatPage,
-            ],
+      child: SwipeableChatLayoutTransition(
+        isTransitioning: _isTransitioning,
+        child: ScrollConfiguration(
+          behavior: ScrollConfiguration.of(context).copyWith(
+            dragDevices: {
+              PointerDeviceKind.touch,
+              PointerDeviceKind.mouse,
+              PointerDeviceKind.trackpad,
+            },
+          ),
+          child: NotificationListener<Notification>(
+            onNotification: (notification) {
+              if (notification is SwipeBackNotification) {
+                _pageController.animateToPage(
+                  0,
+                  duration: const Duration(milliseconds: 300),
+                  curve: Curves.easeOut,
+                );
+                return true;
+              }
+              if (notification is ShowChatNotification) {
+                _pageController.animateToPage(
+                  1,
+                  duration: const Duration(milliseconds: 300),
+                  curve: Curves.easeOut,
+                );
+                return true;
+              }
+              return false;
+            },
+            child: PageView(
+              controller: _pageController,
+              physics: const BouncingScrollPhysics(),
+              children: [
+                ChatList(
+                  key: ValueKey('swipeable_chat_list_${spaceId ?? 'all'}'),
+                  activeChat: widget.roomId.isEmpty ? null : widget.roomId,
+                  activeSpace: spaceId,
+                  displayNavigationRail: true,
+                ),
+                widget.chatPage,
+              ],
+            ),
           ),
         ),
       ),

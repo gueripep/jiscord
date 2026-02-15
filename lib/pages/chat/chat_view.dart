@@ -14,6 +14,7 @@ import 'package:fluffychat/pages/chat/chat.dart';
 import 'package:fluffychat/pages/chat/chat_app_bar_list_tile.dart';
 import 'package:fluffychat/pages/chat/chat_app_bar_title.dart';
 import 'package:fluffychat/pages/chat/chat_event_list.dart';
+import 'package:fluffychat/pages/chat/swipeable_chat_layout.dart';
 import 'package:fluffychat/pages/chat/encryption_button.dart';
 import 'package:fluffychat/pages/chat/pinned_events.dart';
 import 'package:fluffychat/pages/chat/reply_display.dart';
@@ -326,20 +327,34 @@ class ChatView extends StatelessWidget {
                     if (accountConfig.wallpaperUrl != null)
                       Opacity(
                         opacity: accountConfig.wallpaperOpacity ?? 0.5,
-                        child: ImageFiltered(
-                          imageFilter: ui.ImageFilter.blur(
-                            sigmaX: accountConfig.wallpaperBlur ?? 0.0,
-                            sigmaY: accountConfig.wallpaperBlur ?? 0.0,
-                          ),
-                          child: MxcImage(
-                            cacheKey: accountConfig.wallpaperUrl.toString(),
-                            uri: accountConfig.wallpaperUrl,
-                            fit: BoxFit.cover,
-                            height: MediaQuery.sizeOf(context).height,
-                            width: MediaQuery.sizeOf(context).width,
-                            isThumbnail: false,
-                            placeholder: (_) => Container(),
-                          ),
+                        child: ValueListenableBuilder<bool>(
+                          valueListenable:
+                              SwipeableChatLayoutTransition.maybeOf(
+                                context,
+                              )?.isTransitioning ??
+                              ValueNotifier(false),
+                          builder: (context, isTransitioning, _) {
+                            final blur = isTransitioning
+                                ? 0.0
+                                : (accountConfig.wallpaperBlur ?? 0.0);
+                            final wallpaper = MxcImage(
+                              cacheKey: accountConfig.wallpaperUrl.toString(),
+                              uri: accountConfig.wallpaperUrl,
+                              fit: BoxFit.cover,
+                              height: MediaQuery.sizeOf(context).height,
+                              width: MediaQuery.sizeOf(context).width,
+                              isThumbnail: false,
+                              placeholder: (_) => Container(),
+                            );
+                            if (blur == 0.0) return wallpaper;
+                            return ImageFiltered(
+                              imageFilter: ui.ImageFilter.blur(
+                                sigmaX: blur,
+                                sigmaY: blur,
+                              ),
+                              child: wallpaper,
+                            );
+                          },
                         ),
                       ),
                     SafeArea(
@@ -348,7 +363,9 @@ class ChatView extends StatelessWidget {
                           Expanded(
                             child: GestureDetector(
                               onTap: controller.clearSingleSelectedEvent,
-                              child: ChatEventList(controller: controller),
+                              child: RepaintBoundary(
+                                child: ChatEventList(controller: controller),
+                              ),
                             ),
                           ),
                           if (controller.showScrollDownButton)
@@ -407,13 +424,15 @@ class ChatView extends StatelessWidget {
                                           ),
                                         ],
                                       )
-                                    : Column(
-                                        mainAxisSize: .min,
-                                        children: [
-                                          ReplyDisplay(controller),
-                                          ChatInputRow(controller),
-                                          ChatEmojiPicker(controller),
-                                        ],
+                                    : RepaintBoundary(
+                                        child: Column(
+                                          mainAxisSize: .min,
+                                          children: [
+                                            ReplyDisplay(controller),
+                                            ChatInputRow(controller),
+                                            ChatEmojiPicker(controller),
+                                          ],
+                                        ),
                                       ),
                               ),
                             ),

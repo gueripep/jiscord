@@ -10,6 +10,7 @@ import 'package:fluffychat/pages/chat/chat.dart';
 import 'package:fluffychat/pages/chat/events/message.dart';
 import 'package:fluffychat/pages/chat/seen_by_row.dart';
 import 'package:fluffychat/pages/chat/typing_indicators.dart';
+import 'package:fluffychat/pages/chat/swipeable_chat_layout.dart';
 import 'package:fluffychat/utils/account_config.dart';
 import 'package:fluffychat/utils/matrix_sdk_extensions/filtered_timeline_extension.dart';
 import 'package:fluffychat/utils/platform_infos.dart';
@@ -48,159 +49,175 @@ class ChatEventList extends StatelessWidget {
         controller.room.client.applicationAccountConfig.wallpaperUrl != null;
 
     return SelectionArea(
-      child: ListView.custom(
-        cacheExtent:
-            3000, // Large cache to stabilize scrollbar and pre-render embeds
-        // Desktop: hard stop at edges (no overscroll bounce)
-        // Mobile: natural iOS/Android overscroll behavior
-        physics: PlatformInfos.isDesktop
-            ? const ClampingScrollPhysics(
-                parent: AlwaysScrollableScrollPhysics(),
-              )
-            : const BouncingScrollPhysics(
-                parent: AlwaysScrollableScrollPhysics(),
-              ),
-        padding: EdgeInsets.only(
-          top: 16,
-          bottom: 8,
-          left: horizontalPadding,
-          right: horizontalPadding,
-        ),
-        reverse: true,
-        controller: controller.scrollController,
-        keyboardDismissBehavior: PlatformInfos.isIOS
-            ? ScrollViewKeyboardDismissBehavior.onDrag
-            : ScrollViewKeyboardDismissBehavior.manual,
-        childrenDelegate: SliverChildBuilderDelegate(
-          (BuildContext context, int i) {
-            // Footer to display typing indicator and read receipts:
-            if (i == 0) {
-              if (timeline.canRequestFuture) {
-                return Center(
-                  child: TextButton.icon(
-                    onPressed: timeline.isRequestingFuture
-                        ? null
-                        : controller.requestFuture,
-                    icon: timeline.isRequestingFuture
-                        ? CircularProgressIndicator.adaptive(strokeWidth: 2)
-                        : const Icon(Icons.arrow_downward_outlined),
-                    label: Text(L10n.of(context).loadMore),
+      child: ValueListenableBuilder<bool>(
+        valueListenable:
+            SwipeableChatLayoutTransition.maybeOf(context)?.isTransitioning ??
+            ValueNotifier(false),
+        builder: (context, isTransitioning, _) {
+          return ListView.custom(
+            cacheExtent: isTransitioning
+                ? 500
+                : 3000, // Large cache to stabilize scrollbar and pre-render embeds
+            // Desktop: hard stop at edges (no overscroll bounce)
+            // Mobile: natural iOS/Android overscroll behavior
+            physics: PlatformInfos.isDesktop
+                ? const ClampingScrollPhysics(
+                    parent: AlwaysScrollableScrollPhysics(),
+                  )
+                : const BouncingScrollPhysics(
+                    parent: AlwaysScrollableScrollPhysics(),
                   ),
-                );
-              }
-              return Column(
-                mainAxisSize: .min,
-                children: [
-                  SeenByRow(event: events.first),
-                  TypingIndicators(controller),
-                ],
-              );
-            }
-
-            // Request history button or progress indicator:
-            if (i == events.length + 1) {
-              if (controller.activeThreadId != null ||
-                  !timeline.canRequestHistory) {
-                return const SizedBox.shrink();
-              }
-              return Builder(
-                builder: (context) {
-                  final visibleIndex = timeline.events.lastIndexWhere(
-                    (event) => !event.isCollapsedState && event.isVisibleInGui,
-                  );
-                  if (visibleIndex > timeline.events.length - 50) {
-                    WidgetsBinding.instance.addPostFrameCallback(
-                      controller.requestHistory,
+            padding: EdgeInsets.only(
+              top: 16,
+              bottom: 8,
+              left: horizontalPadding,
+              right: horizontalPadding,
+            ),
+            reverse: true,
+            controller: controller.scrollController,
+            keyboardDismissBehavior: PlatformInfos.isIOS
+                ? ScrollViewKeyboardDismissBehavior.onDrag
+                : ScrollViewKeyboardDismissBehavior.manual,
+            childrenDelegate: SliverChildBuilderDelegate(
+              (BuildContext context, int i) {
+                // Footer to display typing indicator and read receipts:
+                if (i == 0) {
+                  if (timeline.canRequestFuture) {
+                    return Center(
+                      child: TextButton.icon(
+                        onPressed: timeline.isRequestingFuture
+                            ? null
+                            : controller.requestFuture,
+                        icon: timeline.isRequestingFuture
+                            ? CircularProgressIndicator.adaptive(strokeWidth: 2)
+                            : const Icon(Icons.arrow_downward_outlined),
+                        label: Text(L10n.of(context).loadMore),
+                      ),
                     );
                   }
-                  return Center(
-                    child: TextButton.icon(
-                      onPressed: timeline.isRequestingHistory
-                          ? null
-                          : controller.requestHistory,
-                      icon: timeline.isRequestingHistory
-                          ? CircularProgressIndicator.adaptive(strokeWidth: 2)
-                          : const Icon(Icons.arrow_upward_outlined),
-                      label: Text(L10n.of(context).loadMore),
-                    ),
+                  return Column(
+                    mainAxisSize: .min,
+                    children: [
+                      SeenByRow(event: events.first),
+                      TypingIndicators(controller),
+                    ],
                   );
-                },
-              );
-            }
-            i--;
+                }
 
-            // The message at this index:
-            final event = events[i];
-            final animateIn =
-                animateInEventIndex != null &&
-                timeline.events.length > animateInEventIndex &&
-                event == timeline.events[animateInEventIndex];
+                // Request history button or progress indicator:
+                if (i == events.length + 1) {
+                  if (controller.activeThreadId != null ||
+                      !timeline.canRequestHistory) {
+                    return const SizedBox.shrink();
+                  }
+                  return Builder(
+                    builder: (context) {
+                      final visibleIndex = timeline.events.lastIndexWhere(
+                        (event) =>
+                            !event.isCollapsedState && event.isVisibleInGui,
+                      );
+                      if (visibleIndex > timeline.events.length - 50) {
+                        WidgetsBinding.instance.addPostFrameCallback(
+                          controller.requestHistory,
+                        );
+                      }
+                      return Center(
+                        child: TextButton.icon(
+                          onPressed: timeline.isRequestingHistory
+                              ? null
+                              : controller.requestHistory,
+                          icon: timeline.isRequestingHistory
+                              ? CircularProgressIndicator.adaptive(
+                                  strokeWidth: 2,
+                                )
+                              : const Icon(Icons.arrow_upward_outlined),
+                          label: Text(L10n.of(context).loadMore),
+                        ),
+                      );
+                    },
+                  );
+                }
+                i--;
 
-            final nextEvent = i + 1 < events.length ? events[i + 1] : null;
-            final previousEvent = i > 0 ? events[i - 1] : null;
+                // The message at this index:
+                final event = events[i];
+                final animateIn =
+                    animateInEventIndex != null &&
+                    timeline.events.length > animateInEventIndex &&
+                    event == timeline.events[animateInEventIndex];
 
-            // Collapsed state event
-            final canExpand =
-                event.isCollapsedState &&
-                nextEvent?.isCollapsedState == true &&
-                previousEvent?.isCollapsedState != true;
-            final isCollapsed =
-                event.isCollapsedState &&
-                previousEvent?.isCollapsedState == true &&
-                !controller.expandedEventIds.contains(event.eventId);
+                final nextEvent = i + 1 < events.length ? events[i + 1] : null;
+                final previousEvent = i > 0 ? events[i - 1] : null;
 
-            return AutoScrollTag(
-              key: ValueKey(event.eventId),
-              index: i,
-              controller: controller.scrollController,
-              child: Message(
-                event,
-                animateIn: animateIn,
-                resetAnimateIn: () {
-                  controller.animateInEventIndex = null;
-                },
-                onSwipe: () => controller.replyAction(replyTo: event),
-                onInfoTab: controller.showEventInfo,
-                onMention: () => controller.sendController.text +=
-                    '${event.senderFromMemoryOrFallback.mention} ',
-                highlightMarker:
-                    controller.scrollToEventIdMarker == event.eventId,
-                onSelect: controller.onSelectMessage,
-                scrollToEventId: (String eventId) =>
-                    controller.scrollToEventId(eventId),
-                longPressSelect: controller.selectedEvents.isNotEmpty,
-                selected: controller.selectedEvents.any(
-                  (e) => e.eventId == event.eventId,
-                ),
-                singleSelected:
-                    controller.selectedEvents.singleOrNull?.eventId ==
-                    event.eventId,
-                onEdit: () => controller.editSelectedEventAction(),
-                timeline: timeline,
-                displayReadMarker:
-                    i > 0 && controller.readMarkerEventId == event.eventId,
-                nextEvent: nextEvent,
-                previousEvent: previousEvent,
-                wallpaperMode: hasWallpaper,
-                scrollController: controller.scrollController,
-                colors: colors,
-                isCollapsed: isCollapsed,
-                enterThread: controller.activeThreadId == null
-                    ? controller.enterThread
-                    : null,
-                onExpand: canExpand
-                    ? () => controller.expandEventsFrom(
-                        event,
-                        !controller.expandedEventIds.contains(event.eventId),
-                      )
-                    : null,
-              ),
-            );
-          },
-          childCount: events.length + 2,
-          findChildIndexCallback: (key) =>
-              controller.findChildIndexCallback(key, thisEventsKeyMap),
-        ),
+                // Collapsed state event
+                final canExpand =
+                    event.isCollapsedState &&
+                    nextEvent?.isCollapsedState == true &&
+                    previousEvent?.isCollapsedState != true;
+                final isCollapsed =
+                    event.isCollapsedState &&
+                    previousEvent?.isCollapsedState == true &&
+                    !controller.expandedEventIds.contains(event.eventId);
+
+                return AutoScrollTag(
+                  key: ValueKey(event.eventId),
+                  index: i,
+                  controller: controller.scrollController,
+                  child: RepaintBoundary(
+                    child: Message(
+                      event,
+                      animateIn: animateIn,
+                      resetAnimateIn: () {
+                        controller.animateInEventIndex = null;
+                      },
+                      onSwipe: () => controller.replyAction(replyTo: event),
+                      onInfoTab: controller.showEventInfo,
+                      onMention: () => controller.sendController.text +=
+                          '${event.senderFromMemoryOrFallback.mention} ',
+                      highlightMarker:
+                          controller.scrollToEventIdMarker == event.eventId,
+                      onSelect: controller.onSelectMessage,
+                      scrollToEventId: (String eventId) =>
+                          controller.scrollToEventId(eventId),
+                      longPressSelect: controller.selectedEvents.isNotEmpty,
+                      selected: controller.selectedEvents.any(
+                        (e) => e.eventId == event.eventId,
+                      ),
+                      singleSelected:
+                          controller.selectedEvents.singleOrNull?.eventId ==
+                          event.eventId,
+                      onEdit: () => controller.editSelectedEventAction(),
+                      timeline: timeline,
+                      displayReadMarker:
+                          i > 0 &&
+                          controller.readMarkerEventId == event.eventId,
+                      nextEvent: nextEvent,
+                      previousEvent: previousEvent,
+                      wallpaperMode: hasWallpaper,
+                      scrollController: controller.scrollController,
+                      colors: colors,
+                      isCollapsed: isCollapsed,
+                      enterThread: controller.activeThreadId == null
+                          ? controller.enterThread
+                          : null,
+                      onExpand: canExpand
+                          ? () => controller.expandEventsFrom(
+                              event,
+                              !controller.expandedEventIds.contains(
+                                event.eventId,
+                              ),
+                            )
+                          : null,
+                    ),
+                  ),
+                );
+              },
+              childCount: events.length + 2,
+              findChildIndexCallback: (key) =>
+                  controller.findChildIndexCallback(key, thisEventsKeyMap),
+            ),
+          );
+        },
       ),
     );
   }
