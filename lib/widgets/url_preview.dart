@@ -358,13 +358,31 @@ class _UrlPreviewState extends State<UrlPreview> {
     return FutureBuilder<LinkMetadata?>(
       future: _metadataFuture,
       builder: (context, snapshot) {
+        final theme = Theme.of(context);
         if (!snapshot.hasData || snapshot.data == null) {
-          return const SizedBox.shrink();
+          return Padding(
+            padding: const EdgeInsets.only(top: 8.0),
+            child: Container(
+              width: 400,
+              height: 120, // Stable loading height
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surfaceContainer,
+                borderRadius: BorderRadius.circular(widget.borderRadius),
+                border: Border(
+                  left: BorderSide(
+                    color: theme.colorScheme.primary.withAlpha(64),
+                    width: 4.0,
+                  ),
+                ),
+              ),
+              child: const Center(
+                child: CircularProgressIndicator.adaptive(strokeWidth: 2),
+              ),
+            ),
+          );
         }
 
         final metadata = snapshot.data!;
-        final theme = Theme.of(context);
-
         // Discord-style left border color
         final borderColor = metadata.themeColor ?? theme.colorScheme.primary;
 

@@ -49,6 +49,17 @@ class ChatEventList extends StatelessWidget {
 
     return SelectionArea(
       child: ListView.custom(
+        cacheExtent:
+            3000, // Large cache to stabilize scrollbar and pre-render embeds
+        // Desktop: hard stop at edges (no overscroll bounce)
+        // Mobile: natural iOS/Android overscroll behavior
+        physics: PlatformInfos.isDesktop
+            ? const ClampingScrollPhysics(
+                parent: AlwaysScrollableScrollPhysics(),
+              )
+            : const BouncingScrollPhysics(
+                parent: AlwaysScrollableScrollPhysics(),
+              ),
         padding: EdgeInsets.only(
           top: 16,
           bottom: 8,
