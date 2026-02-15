@@ -16,6 +16,7 @@ import 'package:fluffychat/utils/client_manager.dart';
 import 'package:fluffychat/utils/notification_background_handler.dart';
 import 'package:fluffychat/utils/platform_infos.dart';
 import 'config/setting_keys.dart';
+import 'widgets/url_preview.dart';
 import 'utils/background_push.dart';
 import 'widgets/fluffy_chat_app.dart';
 
@@ -56,6 +57,13 @@ void main() async {
   Logs().i('Welcome to ${AppSettings.applicationName.value} <3');
 
   await vod.init(wasmPath: './assets/assets/vodozemac/');
+
+  // Purge expired URL preview cache on startup
+  try {
+    await UrlPreview.purgeExpiredCache();
+  } catch (e) {
+    Logs().e('Failed to purge URL preview cache', e);
+  }
 
   Logs().nativeColors = !PlatformInfos.isIOS;
   final clients = await ClientManager.getClients(store: store);

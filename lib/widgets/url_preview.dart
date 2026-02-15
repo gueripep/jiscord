@@ -21,6 +21,29 @@ class UrlPreview extends StatefulWidget {
     this.borderRadius = 12.0,
   });
 
+  /// Purges all expired URL preview cache entries from persistent storage.
+  /// This should be called on app startup.
+  static Future<void> purgeExpiredCache() async {
+    final keys = AppSettings.store.getKeys();
+    final now = DateTime.now();
+    for (final key in keys) {
+      if (key.startsWith('url_preview_cache_')) {
+        try {
+          final storedJson = AppSettings.store.getString(key);
+          if (storedJson != null) {
+            final metadata = LinkMetadata.fromJson(jsonDecode(storedJson));
+            if (metadata.cachedAt != null &&
+                now.difference(metadata.cachedAt!).inDays >= 7) {
+              await AppSettings.store.remove(key);
+            }
+          }
+        } catch (e) {
+          debugPrint('Error purging cache key $key: $e');
+        }
+      }
+    }
+  }
+
   @override
   State<UrlPreview> createState() => _UrlPreviewState();
 }
@@ -61,14 +84,22 @@ class _UrlPreviewState extends State<UrlPreview> {
       }
 
       // Check persistent cache
-      final storedJson = AppSettings.store.getString(
-        'url_preview_cache_${widget.url}',
-      );
+      final cacheKey = 'url_preview_cache_${widget.url}';
+      final storedJson = AppSettings.store.getString(cacheKey);
       if (storedJson != null) {
         try {
           final metadata = LinkMetadata.fromJson(jsonDecode(storedJson));
-          _cache[widget.url] = metadata;
-          return metadata;
+
+          // Check if expired (7 days)
+          final now = DateTime.now();
+          if (metadata.cachedAt != null &&
+              now.difference(metadata.cachedAt!).inDays < 7) {
+            _cache[widget.url] = metadata;
+            return metadata;
+          } else {
+            // Cache expired, remove it
+            await AppSettings.store.remove(cacheKey);
+          }
         } catch (e) {
           debugPrint('Error decoding cached metadata: $e');
         }
@@ -241,10 +272,22 @@ class _UrlPreviewState extends State<UrlPreview> {
   }
 
   void _saveToCache(LinkMetadata metadata) {
-    _cache[widget.url] = metadata;
+    // Add current timestamp for expiration tracking
+    final metadataWithTime = LinkMetadata(
+      title: metadata.title,
+      description: metadata.description,
+      imageUrl: metadata.imageUrl,
+      videoUrl: metadata.videoUrl,
+      siteName: metadata.siteName,
+      themeColor: metadata.themeColor,
+      url: metadata.url,
+      cachedAt: DateTime.now(),
+    );
+
+    _cache[widget.url] = metadataWithTime;
     AppSettings.store.setString(
       'url_preview_cache_${widget.url}',
-      jsonEncode(metadata.toJson()),
+      jsonEncode(metadataWithTime.toJson()),
     );
   }
 
@@ -528,6 +571,7 @@ class LinkMetadata {
   final String? siteName;
   final Color? themeColor;
   final String url;
+  final DateTime? cachedAt;
 
   LinkMetadata({
     this.title,
@@ -537,6 +581,7 @@ class LinkMetadata {
     this.siteName,
     this.themeColor,
     required this.url,
+    this.cachedAt,
   });
 
   Map<String, dynamic> toJson() {
@@ -548,6 +593,7 @@ class LinkMetadata {
       'siteName': siteName,
       'themeColor': themeColor?.value,
       'url': url,
+      'cachedAt': cachedAt?.millisecondsSinceEpoch,
     };
   }
 
@@ -560,6 +606,9 @@ class LinkMetadata {
       siteName: json['siteName'],
       themeColor: json['themeColor'] != null ? Color(json['themeColor']) : null,
       url: json['url'] ?? '',
+      cachedAt: json['cachedAt'] != null
+          ? DateTime.fromMillisecondsSinceEpoch(json['cachedAt'])
+          : null,
     );
   }
 }
