@@ -144,6 +144,54 @@ class _UrlPreviewState extends State<UrlPreview> {
         }
       }
 
+      // Special handling for Instagram / KKInstagram
+      if (uri.host.contains('instagram.com') ||
+          uri.host.contains('kkinstagram.com')) {
+        try {
+          final isReel = uri.path.contains('/reel/');
+          final id = uri.pathSegments.lastWhere(
+            (s) => s.isNotEmpty,
+            orElse: () => '',
+          );
+
+          if (id.isNotEmpty) {
+            final instaUri = Uri.https('www.instagram.com', uri.path);
+
+            // Fetch metadata from Instagram directly using Twitterbot UA
+            final metadataResponse = await http
+                .get(instaUri, headers: {'User-Agent': 'Twitterbot/1.0'})
+                .timeout(const Duration(seconds: 5));
+
+            if (metadataResponse.statusCode == 200) {
+              final document = parser.parse(metadataResponse.body);
+              final metadata = _extractMetadata(document, instaUri);
+
+              if (metadata != null) {
+                // If it's a reel, use kkinstagram as the video source
+                String? videoUrl;
+                if (isReel) {
+                  videoUrl = 'https://kkinstagram.com${uri.path}';
+                }
+
+                final finalMetadata = LinkMetadata(
+                  title: metadata.title,
+                  description: metadata.description,
+                  imageUrl: metadata.imageUrl,
+                  videoUrl: videoUrl,
+                  siteName: 'Instagram',
+                  url: widget.url,
+                  themeColor: const Color(0xFFE4405F), // Insta pink/red
+                );
+                _cache[widget.url] = finalMetadata;
+                return finalMetadata;
+              }
+            }
+          }
+        } catch (e) {
+          debugPrint('Instagram fetch failed: $e');
+        }
+      }
+
       final response = await http
           .get(
             uri,
@@ -377,14 +425,44 @@ class _UrlPreviewState extends State<UrlPreview> {
   }
 
   Future<void> _playVideo(String url) async {
+    // Dispose old controllers if they exist
+    await _videoPlayerController?.dispose();
+    _chewieController?.dispose();
+
     setState(() {
       _isInitializing = true;
+      _isPlaying = false;
       _error = null;
     });
 
     try {
-      _videoPlayerController = VideoPlayerController.networkUrl(Uri.parse(url));
+      _videoPlayerController = VideoPlayerController.networkUrl(
+        Uri.parse(url),
+        httpHeaders: {
+          'User-Agent':
+              'Mozilla/5.0 (compatible; Discordbot/2.0; +https://discordapp.com)',
+        },
+      );
       await _videoPlayerController!.initialize();
+
+      // Add completion listener
+      _videoPlayerController!.addListener(() {
+        if (mounted &&
+            _videoPlayerController!.value.isInitialized &&
+            _videoPlayerController!.value.position >=
+                _videoPlayerController!.value.duration &&
+            _isPlaying) {
+          _videoPlayerController!.pause();
+          setState(() {
+            _isPlaying = false;
+          });
+          // Clean up controllers as they are no longer needed
+          _chewieController?.dispose();
+          _chewieController = null;
+          _videoPlayerController?.dispose();
+          _videoPlayerController = null;
+        }
+      });
 
       _chewieController = ChewieController(
         videoPlayerController: _videoPlayerController!,
