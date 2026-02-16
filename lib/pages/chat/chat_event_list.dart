@@ -48,16 +48,18 @@ class ChatEventList extends StatelessWidget {
     final hasWallpaper =
         controller.room.client.applicationAccountConfig.wallpaperUrl != null;
 
-    return SelectionArea(
-      child: ValueListenableBuilder<bool>(
-        valueListenable:
-            SwipeableChatLayoutTransition.maybeOf(context)?.isTransitioning ??
-            ValueNotifier(false),
-        builder: (context, isTransitioning, _) {
-          return ListView.custom(
-            cacheExtent: isTransitioning
-                ? 0
-                : 500, // Reduced cache to improve scrolling performance
+    return ValueListenableBuilder<bool>(
+      valueListenable:
+          SwipeableChatLayoutTransition.maybeOf(context)?.isTransitioning ??
+          ValueNotifier(false),
+      builder: (context, isTransitioning, _) {
+        return SelectionArea(
+          focusNode: isTransitioning
+              ? FocusNode()
+              : null, // Disable selection interaction during transition
+          child: ListView.custom(
+            cacheExtent:
+                500, // Keep constant to avoid layout triggers on swipe start
             // Desktop: hard stop at edges (no overscroll bounce)
             // Mobile: natural iOS/Android overscroll behavior
             physics: PlatformInfos.isDesktop
@@ -216,9 +218,9 @@ class ChatEventList extends StatelessWidget {
               findChildIndexCallback: (key) =>
                   controller.findChildIndexCallback(key, thisEventsKeyMap),
             ),
-          );
-        },
-      ),
+          ),
+        );
+      },
     );
   }
 }

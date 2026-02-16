@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'package:collection/collection.dart';
 import 'package:go_router/go_router.dart';
@@ -8,7 +9,9 @@ import 'package:matrix/matrix.dart' as sdk;
 import 'package:matrix/matrix.dart';
 
 import 'package:fluffychat/config/app_config.dart';
+import 'package:fluffychat/config/themes.dart';
 import 'package:fluffychat/l10n/l10n.dart';
+import 'package:fluffychat/pages/chat/swipeable_chat_layout.dart';
 import 'package:fluffychat/pages/chat_list/unread_bubble.dart';
 import 'package:fluffychat/utils/localized_exception_extension.dart';
 import 'package:fluffychat/utils/matrix_sdk_extensions/matrix_locals.dart';
@@ -421,344 +424,363 @@ class _SpaceViewState extends State<SpaceView> {
         room?.getLocalizedDisplayname() ?? L10n.of(context).nothingFound;
     const avatarSize = Avatar.defaultSize / 1.5;
     final isAdmin = room?.canChangeStateEvent(EventTypes.SpaceChild) == true;
-    return Scaffold(
-      appBar: AppBar(
-        leading: null,
-        automaticallyImplyLeading: false,
-        titleSpacing: 0,
-        title: ListTile(
-          contentPadding: const EdgeInsets.only(left: 16.0),
-          leading: Avatar(
-            size: avatarSize,
-            mxContent: room?.avatar,
-            name: displayname,
-            border: BorderSide(width: 1, color: theme.dividerColor),
-            borderRadius: BorderRadius.circular(AppConfig.borderRadius / 2),
+    return PopScope(
+      canPop: FluffyThemes.isColumnMode(context),
+      onPopInvokedWithResult: (pop, _) {
+        if (pop) return;
+
+        // If we are in swipeable mode, only handle back if we are actually
+        // on the list page (index 0). If we are on the chat page (index 1),
+        // we let ChatPage's PopScope handle it.
+        final transition = SwipeableChatLayoutTransition.maybeOf(context);
+        if (transition != null && transition.currentPage.value > 0.5) return;
+
+        if (!FluffyThemes.isColumnMode(context)) {
+          SystemNavigator.pop();
+        }
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          leading: null,
+          automaticallyImplyLeading: false,
+          titleSpacing: 0,
+          title: ListTile(
+            contentPadding: const EdgeInsets.only(left: 16.0),
+            leading: Avatar(
+              size: avatarSize,
+              mxContent: room?.avatar,
+              name: displayname,
+              border: BorderSide(width: 1, color: theme.dividerColor),
+              borderRadius: BorderRadius.circular(AppConfig.borderRadius / 2),
+            ),
+            title: Text(
+              displayname,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
-          title: Text(
-            displayname,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ),
-        actions: [
-          PopupMenuButton<SpaceActions>(
-            useRootNavigator: true,
-            onSelected: _onSpaceAction,
-            itemBuilder: (context) => [
-              PopupMenuItem(
-                value: SpaceActions.settings,
-                child: Row(
-                  mainAxisSize: .min,
-                  children: [
-                    const Icon(Icons.settings_outlined),
-                    const SizedBox(width: 12),
-                    Text(L10n.of(context).settings),
-                  ],
+          actions: [
+            PopupMenuButton<SpaceActions>(
+              useRootNavigator: true,
+              onSelected: _onSpaceAction,
+              itemBuilder: (context) => [
+                PopupMenuItem(
+                  value: SpaceActions.settings,
+                  child: Row(
+                    mainAxisSize: .min,
+                    children: [
+                      const Icon(Icons.settings_outlined),
+                      const SizedBox(width: 12),
+                      Text(L10n.of(context).settings),
+                    ],
+                  ),
                 ),
-              ),
-              PopupMenuItem(
-                value: SpaceActions.invite,
-                child: Row(
-                  mainAxisSize: .min,
-                  children: [
-                    const Icon(Icons.person_add_outlined),
-                    const SizedBox(width: 12),
-                    Text(L10n.of(context).invite),
-                  ],
+                PopupMenuItem(
+                  value: SpaceActions.invite,
+                  child: Row(
+                    mainAxisSize: .min,
+                    children: [
+                      const Icon(Icons.person_add_outlined),
+                      const SizedBox(width: 12),
+                      Text(L10n.of(context).invite),
+                    ],
+                  ),
                 ),
-              ),
-              PopupMenuItem(
-                value: SpaceActions.members,
-                child: Row(
-                  mainAxisSize: .min,
-                  children: [
-                    const Icon(Icons.group_outlined),
-                    const SizedBox(width: 12),
-                    Text(
-                      L10n.of(context).countParticipants(
-                        room?.summary.mJoinedMemberCount ?? 1,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              PopupMenuItem(
-                value: SpaceActions.leave,
-                child: Row(
-                  mainAxisSize: .min,
-                  children: [
-                    const Icon(Icons.delete_outlined),
-                    const SizedBox(width: 12),
-                    Text(L10n.of(context).leave),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-      body: room == null
-          ? const Center(child: Icon(Icons.search_outlined, size: 80))
-          : StreamBuilder(
-              stream: room.client.onSync.stream
-                  .where((s) => s.hasRoomUpdate)
-                  .rateLimit(const Duration(seconds: 1)),
-              builder: (context, snapshot) {
-                return CustomScrollView(
-                  slivers: [
-                    SliverToBoxAdapter(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 8,
+                PopupMenuItem(
+                  value: SpaceActions.members,
+                  child: Row(
+                    mainAxisSize: .min,
+                    children: [
+                      const Icon(Icons.group_outlined),
+                      const SizedBox(width: 12),
+                      Text(
+                        L10n.of(context).countParticipants(
+                          room?.summary.mJoinedMemberCount ?? 1,
                         ),
-                        child: Row(
-                          children: [
-                            Text(
-                              'TEXT CHANNELS',
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.bold,
-                                letterSpacing: 0.5,
-                                color: theme.colorScheme.onSurface.withValues(
-                                  alpha: 0.5,
-                                ),
-                              ),
-                            ),
-                            const Spacer(),
-                            if (isAdmin)
-                              InkWell(
-                                onTap: _addChat,
-                                borderRadius: BorderRadius.circular(12),
-                                child: Icon(
-                                  Icons.add,
-                                  size: 16,
+                      ),
+                    ],
+                  ),
+                ),
+                PopupMenuItem(
+                  value: SpaceActions.leave,
+                  child: Row(
+                    mainAxisSize: .min,
+                    children: [
+                      const Icon(Icons.delete_outlined),
+                      const SizedBox(width: 12),
+                      Text(L10n.of(context).leave),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+        body: room == null
+            ? const Center(child: Icon(Icons.search_outlined, size: 80))
+            : StreamBuilder(
+                stream: room.client.onSync.stream
+                    .where((s) => s.hasRoomUpdate)
+                    .rateLimit(const Duration(seconds: 1)),
+                builder: (context, snapshot) {
+                  return CustomScrollView(
+                    slivers: [
+                      SliverToBoxAdapter(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 8,
+                          ),
+                          child: Row(
+                            children: [
+                              Text(
+                                'TEXT CHANNELS',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 0.5,
                                   color: theme.colorScheme.onSurface.withValues(
                                     alpha: 0.5,
                                   ),
                                 ),
                               ),
-                          ],
+                              const Spacer(),
+                              if (isAdmin)
+                                InkWell(
+                                  onTap: _addChat,
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: Icon(
+                                    Icons.add,
+                                    size: 16,
+                                    color: theme.colorScheme.onSurface
+                                        .withValues(alpha: 0.5),
+                                  ),
+                                ),
+                            ],
+                          ),
                         ),
                       ),
-                    ),
-                    SliverList.builder(
-                      itemCount: _discoveredChildren.length + 1,
-                      itemBuilder: (context, i) {
-                        if (i == _discoveredChildren.length) {
-                          if (_noMoreRooms || _isLoading) {
-                            return const SizedBox.shrink();
+                      SliverList.builder(
+                        itemCount: _discoveredChildren.length + 1,
+                        itemBuilder: (context, i) {
+                          if (i == _discoveredChildren.length) {
+                            if (_noMoreRooms || _isLoading) {
+                              return const SizedBox.shrink();
+                            }
+                            return Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12.0,
+                                vertical: 2.0,
+                              ),
+                              child: TextButton(
+                                onPressed: _isLoading ? null : _loadHierarchy,
+                                child: _isLoading
+                                    ? const CircularProgressIndicator.adaptive()
+                                    : Text(L10n.of(context).loadMore),
+                              ),
+                            );
+                          }
+                          final item = _discoveredChildren[i];
+                          final displayname =
+                              item.name ??
+                              item.canonicalAlias ??
+                              L10n.of(context).emptyChat;
+                          var joinedRoom = room.client.getRoomById(item.roomId);
+                          if (joinedRoom?.membership == Membership.leave) {
+                            joinedRoom = null;
                           }
                           return Padding(
                             padding: const EdgeInsets.symmetric(
-                              horizontal: 12.0,
-                              vertical: 2.0,
+                              horizontal: 8,
+                              vertical: 1,
                             ),
-                            child: TextButton(
-                              onPressed: _isLoading ? null : _loadHierarchy,
-                              child: _isLoading
-                                  ? const CircularProgressIndicator.adaptive()
-                                  : Text(L10n.of(context).loadMore),
-                            ),
-                          );
-                        }
-                        final item = _discoveredChildren[i];
-                        final displayname =
-                            item.name ??
-                            item.canonicalAlias ??
-                            L10n.of(context).emptyChat;
-                        var joinedRoom = room.client.getRoomById(item.roomId);
-                        if (joinedRoom?.membership == Membership.leave) {
-                          joinedRoom = null;
-                        }
-                        return Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 1,
-                          ),
-                          child: Material(
-                            borderRadius: BorderRadius.circular(
-                              AppConfig.borderRadius,
-                            ),
-                            clipBehavior: Clip.hardEdge,
-                            color:
-                                joinedRoom != null &&
-                                    widget.activeChat == joinedRoom.id
-                                ? theme.colorScheme.secondaryContainer
-                                : Colors.transparent,
-                            child: HoverBuilder(
-                              builder: (context, hovered) => GestureDetector(
-                                onSecondaryTap: isAdmin
-                                    ? () => _showSpaceChildEditMenu(
-                                        context,
-                                        item.roomId,
-                                      )
-                                    : null,
-                                child: ListTile(
-                                  visualDensity: const VisualDensity(
-                                    vertical: -0.5,
-                                  ),
-                                  contentPadding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                  ),
-                                  onTap: joinedRoom != null
-                                      ? () => widget.onChatTab(joinedRoom!)
-                                      : () => _joinChildRoom(item),
-                                  onLongPress: isAdmin
+                            child: Material(
+                              borderRadius: BorderRadius.circular(
+                                AppConfig.borderRadius,
+                              ),
+                              clipBehavior: Clip.hardEdge,
+                              color:
+                                  joinedRoom != null &&
+                                      widget.activeChat == joinedRoom.id
+                                  ? theme.colorScheme.secondaryContainer
+                                  : Colors.transparent,
+                              child: HoverBuilder(
+                                builder: (context, hovered) => GestureDetector(
+                                  onSecondaryTap: isAdmin
                                       ? () => _showSpaceChildEditMenu(
                                           context,
                                           item.roomId,
                                         )
                                       : null,
-                                  leading: hovered && isAdmin
-                                      ? SizedBox.square(
-                                          dimension: avatarSize,
-                                          child: IconButton(
-                                            splashRadius: avatarSize,
-                                            iconSize: 14,
-                                            style: IconButton.styleFrom(
-                                              foregroundColor: theme
-                                                  .colorScheme
-                                                  .onTertiaryContainer,
-                                              backgroundColor: theme
-                                                  .colorScheme
-                                                  .tertiaryContainer,
+                                  child: ListTile(
+                                    visualDensity: const VisualDensity(
+                                      vertical: -0.5,
+                                    ),
+                                    contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                    ),
+                                    onTap: joinedRoom != null
+                                        ? () => widget.onChatTab(joinedRoom!)
+                                        : () => _joinChildRoom(item),
+                                    onLongPress: isAdmin
+                                        ? () => _showSpaceChildEditMenu(
+                                            context,
+                                            item.roomId,
+                                          )
+                                        : null,
+                                    leading: hovered && isAdmin
+                                        ? SizedBox.square(
+                                            dimension: avatarSize,
+                                            child: IconButton(
+                                              splashRadius: avatarSize,
+                                              iconSize: 14,
+                                              style: IconButton.styleFrom(
+                                                foregroundColor: theme
+                                                    .colorScheme
+                                                    .onTertiaryContainer,
+                                                backgroundColor: theme
+                                                    .colorScheme
+                                                    .tertiaryContainer,
+                                              ),
+                                              onPressed: () =>
+                                                  _showSpaceChildEditMenu(
+                                                    context,
+                                                    item.roomId,
+                                                  ),
+                                              icon: const Icon(
+                                                Icons.edit_outlined,
+                                              ),
                                             ),
-                                            onPressed: () =>
-                                                _showSpaceChildEditMenu(
-                                                  context,
-                                                  item.roomId,
-                                                ),
-                                            icon: const Icon(
-                                              Icons.edit_outlined,
+                                          )
+                                        : Avatar(
+                                            size: avatarSize,
+                                            mxContent: item.avatarUrl,
+                                            name: '#',
+                                            backgroundColor: theme
+                                                .colorScheme
+                                                .surfaceContainer,
+                                            textColor:
+                                                item.name?.darkColor ??
+                                                theme.colorScheme.onSurface,
+                                            border: item.roomType == 'm.space'
+                                                ? BorderSide(
+                                                    color: theme
+                                                        .colorScheme
+                                                        .surfaceContainerHighest,
+                                                  )
+                                                : null,
+                                            borderRadius:
+                                                item.roomType == 'm.space'
+                                                ? BorderRadius.circular(
+                                                    AppConfig.borderRadius / 4,
+                                                  )
+                                                : null,
+                                          ),
+                                    title: Row(
+                                      children: [
+                                        Expanded(
+                                          child: Opacity(
+                                            opacity: joinedRoom == null
+                                                ? 0.5
+                                                : 1,
+                                            child: Text(
+                                              displayname,
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
                                             ),
                                           ),
-                                        )
-                                      : Avatar(
-                                          size: avatarSize,
-                                          mxContent: item.avatarUrl,
-                                          name: '#',
-                                          backgroundColor: theme
-                                              .colorScheme
-                                              .surfaceContainer,
-                                          textColor:
-                                              item.name?.darkColor ??
-                                              theme.colorScheme.onSurface,
-                                          border: item.roomType == 'm.space'
-                                              ? BorderSide(
-                                                  color: theme
-                                                      .colorScheme
-                                                      .surfaceContainerHighest,
-                                                )
-                                              : null,
-                                          borderRadius:
-                                              item.roomType == 'm.space'
-                                              ? BorderRadius.circular(
-                                                  AppConfig.borderRadius / 4,
-                                                )
-                                              : null,
                                         ),
-                                  title: Row(
-                                    children: [
-                                      Expanded(
-                                        child: Opacity(
-                                          opacity: joinedRoom == null ? 0.5 : 1,
-                                          child: Text(
-                                            displayname,
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
+                                        if (joinedRoom != null)
+                                          UnreadBubble(room: joinedRoom)
+                                        else
+                                          const Icon(
+                                            Icons.chevron_right_outlined,
                                           ),
-                                        ),
-                                      ),
-                                      if (joinedRoom != null)
-                                        UnreadBubble(room: joinedRoom)
-                                      else
-                                        const Icon(
-                                          Icons.chevron_right_outlined,
-                                        ),
-                                    ],
+                                      ],
+                                    ),
                                   ),
                                 ),
                               ),
                             ),
-                          ),
-                        );
-                      },
-                    ),
-                    SliverToBoxAdapter(
-                      child: FutureBuilder<List<VoiceChannel>>(
-                        future: VoiceChannel.fetchFromRoom(room),
-                        builder: (context, snapshot) {
-                          final voiceChannels = snapshot.data ?? [];
-                          if (voiceChannels.isEmpty && !isAdmin) {
-                            return const SizedBox.shrink();
-                          }
-                          return Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                  vertical: 8,
-                                ),
-                                child: Row(
-                                  children: [
-                                    Text(
-                                      'VOICE CHANNELS',
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.bold,
-                                        letterSpacing: 0.5,
-                                        color: theme.colorScheme.onSurface
-                                            .withValues(alpha: 0.5),
-                                      ),
-                                    ),
-                                    const Spacer(),
-                                    if (isAdmin)
-                                      InkWell(
-                                        onTap: () async {
-                                          final result =
-                                              await VoiceChannelDialog.show(
-                                                context,
-                                                room: room,
-                                              );
-                                          if (result == true) {
-                                            setState(() {});
-                                          }
-                                        },
-                                        borderRadius: BorderRadius.circular(12),
-                                        child: Icon(
-                                          Icons.add,
-                                          size: 16,
+                          );
+                        },
+                      ),
+                      SliverToBoxAdapter(
+                        child: FutureBuilder<List<VoiceChannel>>(
+                          future: VoiceChannel.fetchFromRoom(room),
+                          builder: (context, snapshot) {
+                            final voiceChannels = snapshot.data ?? [];
+                            if (voiceChannels.isEmpty && !isAdmin) {
+                              return const SizedBox.shrink();
+                            }
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 8,
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Text(
+                                        'VOICE CHANNELS',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.bold,
+                                          letterSpacing: 0.5,
                                           color: theme.colorScheme.onSurface
                                               .withValues(alpha: 0.5),
                                         ),
                                       ),
-                                  ],
+                                      const Spacer(),
+                                      if (isAdmin)
+                                        InkWell(
+                                          onTap: () async {
+                                            final result =
+                                                await VoiceChannelDialog.show(
+                                                  context,
+                                                  room: room,
+                                                );
+                                            if (result == true) {
+                                              setState(() {});
+                                            }
+                                          },
+                                          borderRadius: BorderRadius.circular(
+                                            12,
+                                          ),
+                                          child: Icon(
+                                            Icons.add,
+                                            size: 16,
+                                            color: theme.colorScheme.onSurface
+                                                .withValues(alpha: 0.5),
+                                          ),
+                                        ),
+                                    ],
+                                  ),
                                 ),
-                              ),
-                              ...voiceChannels.map(
-                                (ch) => VoiceChannelTile(
-                                  channel: ch,
-                                  onLongPress: isAdmin
-                                      ? () => _showVoiceChannelMenu(ch)
-                                      : null,
-                                  onSecondaryTap: isAdmin
-                                      ? () => _showVoiceChannelMenu(ch)
-                                      : null,
+                                ...voiceChannels.map(
+                                  (ch) => VoiceChannelTile(
+                                    channel: ch,
+                                    onLongPress: isAdmin
+                                        ? () => _showVoiceChannelMenu(ch)
+                                        : null,
+                                    onSecondaryTap: isAdmin
+                                        ? () => _showVoiceChannelMenu(ch)
+                                        : null,
+                                  ),
                                 ),
-                              ),
-                            ],
-                          );
-                        },
+                              ],
+                            );
+                          },
+                        ),
                       ),
-                    ),
-                    const SliverPadding(padding: EdgeInsets.only(top: 32)),
-                  ],
-                );
-              },
-            ),
+                      const SliverPadding(padding: EdgeInsets.only(top: 32)),
+                    ],
+                  );
+                },
+              ),
+      ),
     );
   }
 }

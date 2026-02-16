@@ -77,17 +77,34 @@ class ChatPage extends StatelessWidget {
       eventId: eventId,
     );
 
+    final transition = SwipeableChatLayoutTransition.maybeOf(context);
     if (FluffyThemes.isColumnMode(context)) {
       return child;
     }
 
-    return PopScope(
-      canPop: false,
-      onPopInvokedWithResult: (pop, _) {
-        if (pop) return;
-        SwipeableChatLayout.globalKey.currentState?.animateToPage(0);
+    return ValueListenableBuilder<double>(
+      valueListenable: transition?.currentPage ?? ValueNotifier(1.0),
+      builder: (context, page, _) {
+        final isOnChatPage = page > 0.5;
+
+        return PopScope(
+          canPop: false,
+          onPopInvokedWithResult: (pop, _) {
+            if (pop) return;
+
+            // If we are looking at the chat, swipe back to the list.
+            if (isOnChatPage) {
+              SwipeableChatLayout.globalKey.currentState?.animateToPage(0);
+            }
+            // If we are already looking at the list, force exit the app
+            // immediately (even if the router wants to pop back to /rooms).
+            else if (!FluffyThemes.isColumnMode(context)) {
+              SystemNavigator.pop();
+            }
+          },
+          child: child,
+        );
       },
-      child: child,
     );
   }
 }
@@ -469,7 +486,24 @@ class ChatController extends State<ChatPageWithRoom>
   void updateView() {
     if (!mounted) return;
     setReadMarker();
+
+    // Deferred update: If we are swiping, wait until finished to rebuild the room view.
+    // This prevents incoming messages/typing from stuttering the swipe animation.
+    final transition = SwipeableChatLayoutTransition.maybeOf(context);
+    if (transition?.isTransitioning.value == true) {
+      transition!.isTransitioning.addListener(_deferredUpdateListener);
+      return;
+    }
+
     setState(() {});
+  }
+
+  void _deferredUpdateListener() {
+    final transition = SwipeableChatLayoutTransition.maybeOf(context);
+    if (transition?.isTransitioning.value == false) {
+      transition!.isTransitioning.removeListener(_deferredUpdateListener);
+      if (mounted) setState(() {});
+    }
   }
 
   Future<void>? loadTimelineFuture;

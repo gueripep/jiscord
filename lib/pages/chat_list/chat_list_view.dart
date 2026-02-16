@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'package:fluffychat/config/setting_keys.dart';
 import 'package:fluffychat/config/themes.dart';
 import 'package:fluffychat/pages/chat_list/chat_list.dart';
 import 'package:fluffychat/pages/chat_list/start_chat_fab.dart';
+import 'package:fluffychat/pages/chat/swipeable_chat_layout.dart';
 import 'package:fluffychat/widgets/navigation_rail.dart';
 import 'chat_list_body.dart';
 
@@ -15,24 +17,25 @@ class ChatListView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return PopScope(
-      canPop: !controller.isSearchMode && controller.activeSpaceId == null,
+      canPop: FluffyThemes.isColumnMode(context) && !controller.isSearchMode,
       onPopInvokedWithResult: (pop, _) {
         if (pop) return;
-        // When inside SwipeableChatLayout on mobile, let the outer
-        // PopScope (in SwipeableChatLayout) handle the back gesture.
-        // Otherwise this handler fires first and clears the space/navigates
-        // away before the page-swipe animation can run.
-        if (controller.widget.displayNavigationRail &&
-            !FluffyThemes.isColumnMode(context)) {
-          return;
-        }
-        if (controller.activeSpaceId != null) {
-          controller.clearActiveSpace();
-          return;
-        }
+
+        // If we are in swipeable mode, only handle back if we are actually
+        // on the list page (index 0). If we are on the chat page (index 1),
+        // we let ChatPage's PopScope handle it.
+        final transition = SwipeableChatLayoutTransition.maybeOf(context);
+        if (transition != null && transition.currentPage.value > 0.5) return;
+
         if (controller.isSearchMode) {
           controller.cancelSearch();
           return;
+        }
+        // If we are at the root list and not searching, exit the app.
+        // We use SystemNavigator.pop() to ensure the app closes even if there
+        // is history from switching spaces.
+        if (!FluffyThemes.isColumnMode(context)) {
+          SystemNavigator.pop();
         }
       },
       child: Row(

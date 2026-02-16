@@ -182,7 +182,14 @@ class ChatView extends StatelessWidget {
       },
       child: StreamBuilder(
         stream: controller.room.client.onRoomState.stream
-            .where((update) => update.roomId == controller.room.id)
+            .where(
+              (update) =>
+                  update.roomId == controller.room.id &&
+                  SwipeableChatLayoutTransition.maybeOf(
+                        context,
+                      )?.isTransitioning.value !=
+                      true,
+            )
             .rateLimit(const Duration(seconds: 1)),
         builder: (context, snapshot) => FutureBuilder(
           future: controller.loadTimelineFuture,

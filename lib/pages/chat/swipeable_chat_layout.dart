@@ -1,6 +1,5 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'package:fluffychat/pages/chat_list/chat_list.dart';
 import 'package:fluffychat/pages/chat/swipe_notifications.dart';
 import 'package:fluffychat/widgets/matrix.dart';
@@ -9,7 +8,7 @@ import 'package:fluffychat/widgets/matrix.dart';
 ///
 /// Uses a higher minimum velocity threshold (700 px/s) so that only
 /// intentional swipes trigger page changes, preventing accidental ones.
-class _SnappyPageScrollPhysics extends ScrollPhysics {
+class _SnappyPageScrollPhysics extends PageScrollPhysics {
   const _SnappyPageScrollPhysics({super.parent});
 
   @override
@@ -19,15 +18,20 @@ class _SnappyPageScrollPhysics extends ScrollPhysics {
 
   @override
   SpringDescription get spring =>
-      const SpringDescription(mass: 80, stiffness: 100, damping: 1);
+      const SpringDescription(mass: 0.8, stiffness: 240, damping: 1.0);
+
+  @override
+  double get minFlingVelocity => 30.0; // Even more sensitive to small, fast flicks
 }
 
 class SwipeableChatLayoutTransition extends InheritedWidget {
   final ValueNotifier<bool> isTransitioning;
+  final ValueNotifier<double> currentPage;
 
   const SwipeableChatLayoutTransition({
     super.key,
     required this.isTransitioning,
+    required this.currentPage,
     required super.child,
   });
 
@@ -38,7 +42,8 @@ class SwipeableChatLayoutTransition extends InheritedWidget {
 
   @override
   bool updateShouldNotify(SwipeableChatLayoutTransition oldWidget) {
-    return isTransitioning != oldWidget.isTransitioning;
+    return isTransitioning != oldWidget.isTransitioning ||
+        currentPage != oldWidget.currentPage;
   }
 }
 
@@ -93,11 +98,16 @@ class SwipeableChatLayout extends StatefulWidget {
 class SwipeableChatLayoutState extends State<SwipeableChatLayout> {
   late final PageController _pageController;
   final ValueNotifier<bool> _isTransitioning = ValueNotifier(false);
+  late final ValueNotifier<double> _currentPage;
 
   void _pageListener() {
     if (!_pageController.hasClients) return;
     final page = _pageController.page;
     if (page == null) return;
+
+    if (_currentPage.value != page) {
+      _currentPage.value = page;
+    }
 
     // We are transitioning if the page is not an integer
     final isPageTransitioning = page != page.roundToDouble();
@@ -111,9 +121,11 @@ class SwipeableChatLayoutState extends State<SwipeableChatLayout> {
     super.initState();
     // If we have a roomId, we start on the chat page (1).
     // If no roomId OR if we are opening in background, we start on the chat list (0).
-    _pageController = PageController(
-      initialPage: widget.roomId.isEmpty || widget.openInBackground ? 0 : 1,
-    );
+    final initialPage = widget.roomId.isEmpty || widget.openInBackground
+        ? 0.0
+        : 1.0;
+    _pageController = PageController(initialPage: initialPage.toInt());
+    _currentPage = ValueNotifier(initialPage);
     _pageController.addListener(_pageListener);
   }
 
@@ -122,6 +134,7 @@ class SwipeableChatLayoutState extends State<SwipeableChatLayout> {
     _pageController.removeListener(_pageListener);
     _pageController.dispose();
     _isTransitioning.dispose();
+    _currentPage.dispose();
     super.dispose();
   }
 
@@ -193,67 +206,48 @@ class SwipeableChatLayoutState extends State<SwipeableChatLayout> {
       }
     }
 
-    return PopScope(
-      canPop: false,
-      onPopInvokedWithResult: (didPop, result) {
-        if (didPop) return;
-
-        final currentPage = _pageController.hasClients
-            ? _pageController.page?.round()
-            : null;
-
-        if (currentPage == 1) {
-          // DISCORD STYLE: Just slide back to the list.
-          // Keep the group "open" in the background and in the URL.
-          animateToPage(0);
-        } else {
-          // If we are already at the list, we can allow the app to go back (e.g. to home)
-          context.pop();
-        }
-      },
-      child: SwipeableChatLayoutTransition(
-        isTransitioning: _isTransitioning,
-        child: ScrollConfiguration(
-          behavior: ScrollConfiguration.of(context).copyWith(
-            dragDevices: {
-              PointerDeviceKind.touch,
-              PointerDeviceKind.mouse,
-              PointerDeviceKind.trackpad,
-            },
-          ),
-          child: NotificationListener<Notification>(
-            onNotification: (notification) {
-              if (notification is SwipeBackNotification) {
-                animateToPage(0);
-                return true;
-              }
-              if (notification is ShowChatNotification) {
-                animateToPage(1);
-                return true;
-              }
-              return false;
-            },
-            child: PageView(
-              controller: _pageController,
-              physics: const _SnappyPageScrollPhysics(
-                parent: ClampingScrollPhysics(),
-              ),
-              children: [
-                _KeepAliveWrapper(
-                  child: RepaintBoundary(
-                    child: ChatList(
-                      activeChat: widget.roomId.isEmpty ? null : widget.roomId,
-                      activeSpace: spaceId,
-                      displayNavigationRail: true,
-                      openInBackground: widget.openInBackground,
-                    ),
+    return SwipeableChatLayoutTransition(
+      isTransitioning: _isTransitioning,
+      currentPage: _currentPage,
+      child: ScrollConfiguration(
+        behavior: ScrollConfiguration.of(context).copyWith(
+          dragDevices: {
+            PointerDeviceKind.touch,
+            PointerDeviceKind.mouse,
+            PointerDeviceKind.trackpad,
+          },
+        ),
+        child: NotificationListener<Notification>(
+          onNotification: (notification) {
+            if (notification is SwipeBackNotification) {
+              animateToPage(0);
+              return true;
+            }
+            if (notification is ShowChatNotification) {
+              animateToPage(1);
+              return true;
+            }
+            return false;
+          },
+          child: PageView(
+            dragStartBehavior: DragStartBehavior.down,
+            controller: _pageController,
+            physics: const _SnappyPageScrollPhysics(
+              parent: ClampingScrollPhysics(),
+            ),
+            children: [
+              _KeepAliveWrapper(
+                child: RepaintBoundary(
+                  child: ChatList(
+                    activeChat: widget.roomId.isEmpty ? null : widget.roomId,
+                    activeSpace: spaceId,
+                    displayNavigationRail: true,
+                    openInBackground: widget.openInBackground,
                   ),
                 ),
-                _KeepAliveWrapper(
-                  child: RepaintBoundary(child: widget.chatPage),
-                ),
-              ],
-            ),
+              ),
+              _KeepAliveWrapper(child: RepaintBoundary(child: widget.chatPage)),
+            ],
           ),
         ),
       ),
