@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -63,12 +64,14 @@ class ChatList extends StatefulWidget {
   final String? activeChat;
   final String? activeSpace;
   final bool displayNavigationRail;
+  final bool openInBackground;
 
   const ChatList({
     super.key,
     required this.activeChat,
     this.activeSpace,
     this.displayNavigationRail = false,
+    this.openInBackground = false,
   });
 
   @override
@@ -89,11 +92,82 @@ class ChatListController extends State<ChatList>
   String? get activeSpaceId => _activeSpaceId;
 
   void setActiveSpace(String spaceId) async {
-    await Matrix.of(context).client.getRoomById(spaceId)!.postLoad();
+    final client = Matrix.of(context).client;
+    final space = client.getRoomById(spaceId);
+    await space?.postLoad();
+
     if (!mounted) return;
-    context.go(
-      Uri(path: '/rooms', queryParameters: {'spaceId': spaceId}).toString(),
-    );
+
+    // Try to find the first text group in the space
+    String? firstTextGroupId;
+
+    try {
+      final lastChannelsJson = Matrix.of(
+        context,
+      ).store.getString(_lastChannelsStoreKey);
+      if (lastChannelsJson != null) {
+        final lastChannels = Map<String, String>.from(
+          jsonDecode(lastChannelsJson),
+        );
+        final lastChannelId = lastChannels[spaceId];
+        if (lastChannelId != null) {
+          final room = client.getRoomById(lastChannelId);
+          if (room != null && room.membership == Membership.join) {
+            firstTextGroupId = room.id;
+          }
+        }
+      }
+    } catch (e) {
+      Logs().w('Failed to load last channel for space', e);
+    }
+
+    if (firstTextGroupId == null) {
+      // 1. Check the cache first (fastest)
+      final cacheKey = 'spaces_history_cache$spaceId';
+      final cachedChildren = Matrix.of(context).store.getStringList(cacheKey);
+      if (cachedChildren != null) {
+        for (final jsonString in cachedChildren) {
+          try {
+            final chunk = SpaceRoomsChunk$2.fromJson(jsonDecode(jsonString));
+            final room = client.getRoomById(chunk.roomId);
+            if (room != null &&
+                !room.isSpace &&
+                room.membership == Membership.join) {
+              firstTextGroupId = room.id;
+              break;
+            }
+          } catch (_) {}
+        }
+      }
+
+      // 2. Fallback to client rooms if no cache or no suitable room found in cache
+      if (firstTextGroupId == null) {
+        final children = space?.spaceChildren ?? [];
+        for (final child in children) {
+          if (child.roomId == null) continue;
+          final room = client.getRoomById(child.roomId!);
+          if (room != null &&
+              !room.isSpace &&
+              room.membership == Membership.join) {
+            firstTextGroupId = room.id;
+            break;
+          }
+        }
+      }
+    }
+
+    if (firstTextGroupId != null) {
+      context.go(
+        Uri(
+          path: '/rooms/$firstTextGroupId',
+          queryParameters: {'spaceId': spaceId, 'background': 'true'},
+        ).toString(),
+      );
+    } else {
+      context.go(
+        Uri(path: '/rooms', queryParameters: {'spaceId': spaceId}).toString(),
+      );
+    }
   }
 
   void clearActiveSpace() => context.go('/rooms');
@@ -188,6 +262,8 @@ class ChatListController extends State<ChatList>
 
   bool isSearching = false;
   static const String _serverStoreNamespace = 'im.fluffychat.search.server';
+  static const String _lastChannelsStoreKey =
+      'chat.fluffy.last_channels_per_space';
 
   void setServer() async {
     final newServer = await showTextInputDialog(
@@ -437,6 +513,20 @@ class ChatListController extends State<ChatList>
   void _savePersistentState() {
     AppSettings.lastActiveChat.setItem(widget.activeChat ?? '');
     AppSettings.lastActiveSpace.setItem(widget.activeSpace ?? '');
+
+    if (widget.activeSpace != null && widget.activeChat != null) {
+      try {
+        final store = Matrix.of(context).store;
+        final lastChannelsJson = store.getString(_lastChannelsStoreKey);
+        final lastChannels = lastChannelsJson != null
+            ? Map<String, String>.from(jsonDecode(lastChannelsJson))
+            : <String, String>{};
+        lastChannels[widget.activeSpace!] = widget.activeChat!;
+        store.setString(_lastChannelsStoreKey, jsonEncode(lastChannels));
+      } catch (e) {
+        Logs().w('Failed to save last channel for space', e);
+      }
+    }
   }
 
   @override

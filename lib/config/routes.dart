@@ -183,6 +183,8 @@ abstract class AppRoutes {
               roomId: state.pathParameters['roomid'] ?? '',
               chatPage: child,
               spaceId: state.uri.queryParameters['spaceId'],
+              openInBackground:
+                  state.uri.queryParameters['background'] == 'true',
             ),
           );
         }

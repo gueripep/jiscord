@@ -18,6 +18,14 @@ class ChatListView extends StatelessWidget {
       canPop: !controller.isSearchMode && controller.activeSpaceId == null,
       onPopInvokedWithResult: (pop, _) {
         if (pop) return;
+        // When inside SwipeableChatLayout on mobile, let the outer
+        // PopScope (in SwipeableChatLayout) handle the back gesture.
+        // Otherwise this handler fires first and clears the space/navigates
+        // away before the page-swipe animation can run.
+        if (controller.widget.displayNavigationRail &&
+            !FluffyThemes.isColumnMode(context)) {
+          return;
+        }
         if (controller.activeSpaceId != null) {
           controller.clearActiveSpace();
           return;

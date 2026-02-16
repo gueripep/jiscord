@@ -21,6 +21,7 @@ import 'package:fluffychat/l10n/l10n.dart';
 import 'package:fluffychat/pages/chat/chat_view.dart';
 import 'package:fluffychat/pages/chat/event_info_dialog.dart';
 import 'package:fluffychat/pages/chat/start_poll_bottom_sheet.dart';
+import 'package:fluffychat/pages/chat/swipeable_chat_layout.dart';
 import 'package:fluffychat/pages/chat_details/chat_details.dart';
 import 'package:fluffychat/utils/adaptive_bottom_sheet.dart';
 import 'package:fluffychat/utils/error_reporter.dart';
@@ -69,11 +70,24 @@ class ChatPage extends StatelessWidget {
       );
     }
 
-    return ChatPageWithRoom(
+    final child = ChatPageWithRoom(
       key: Key('chat_page_${roomId}_$eventId'),
       room: room,
       shareItems: shareItems,
       eventId: eventId,
+    );
+
+    if (FluffyThemes.isColumnMode(context)) {
+      return child;
+    }
+
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (pop, _) {
+        if (pop) return;
+        SwipeableChatLayout.globalKey.currentState?.animateToPage(0);
+      },
+      child: child,
     );
   }
 }

@@ -72,22 +72,25 @@ const _kAnimationDuration = Duration(milliseconds: 250);
 const _kAnimationCurve = Curves.easeOutCubic;
 
 class SwipeableChatLayout extends StatefulWidget {
+  static final GlobalKey<SwipeableChatLayoutState> globalKey = GlobalKey();
+
   final String roomId;
   final Widget chatPage;
   final String? spaceId;
+  final bool openInBackground;
 
-  const SwipeableChatLayout({
-    super.key,
+  SwipeableChatLayout({
     required this.roomId,
     required this.chatPage,
     this.spaceId,
-  });
+    this.openInBackground = false,
+  }) : super(key: globalKey);
 
   @override
-  State<SwipeableChatLayout> createState() => _SwipeableChatLayoutState();
+  State<SwipeableChatLayout> createState() => SwipeableChatLayoutState();
 }
 
-class _SwipeableChatLayoutState extends State<SwipeableChatLayout> {
+class SwipeableChatLayoutState extends State<SwipeableChatLayout> {
   late final PageController _pageController;
   final ValueNotifier<bool> _isTransitioning = ValueNotifier(false);
 
@@ -107,9 +110,9 @@ class _SwipeableChatLayoutState extends State<SwipeableChatLayout> {
   void initState() {
     super.initState();
     // If we have a roomId, we start on the chat page (1).
-    // If no roomId, we start on the chat list (0).
+    // If no roomId OR if we are opening in background, we start on the chat list (0).
     _pageController = PageController(
-      initialPage: widget.roomId.isEmpty ? 0 : 1,
+      initialPage: widget.roomId.isEmpty || widget.openInBackground ? 0 : 1,
     );
     _pageController.addListener(_pageListener);
   }
@@ -123,7 +126,7 @@ class _SwipeableChatLayoutState extends State<SwipeableChatLayout> {
   }
 
   /// Animate to a page with consistent Material 3 timing.
-  void _animateToPage(int page) {
+  void animateToPage(int page) {
     if (!_pageController.hasClients) return;
     _pageController.animateToPage(
       page,
@@ -135,20 +138,26 @@ class _SwipeableChatLayoutState extends State<SwipeableChatLayout> {
   @override
   void didUpdateWidget(SwipeableChatLayout oldWidget) {
     super.didUpdateWidget(oldWidget);
+    // 0. Handle background opening (force list view)
+    if (widget.openInBackground) {
+      if (_pageController.hasClients && (_pageController.page ?? 0) > 0.5) {
+        animateToPage(0);
+      }
+    }
     // If we have a roomId (active room)
-    if (widget.roomId.isNotEmpty) {
+    else if (widget.roomId.isNotEmpty) {
       // If the room changed OR if we just tapped the already active room while on the list page
       if (oldWidget.roomId != widget.roomId ||
           (_pageController.hasClients && _pageController.page?.round() == 0)) {
         // Optimistic animation: trigger directly if controller is ready,
         // otherwise wait for post-frame. This removes one frame of delay.
         if (_pageController.hasClients && (_pageController.page ?? 0) < 0.5) {
-          _animateToPage(1);
+          animateToPage(1);
         } else {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (_pageController.hasClients &&
                 (_pageController.page ?? 0) < 0.5) {
-              _animateToPage(1);
+              animateToPage(1);
             }
           });
         }
@@ -157,11 +166,11 @@ class _SwipeableChatLayoutState extends State<SwipeableChatLayout> {
     // If the room was cleared externally (e.g. by switching spaces), slide back to list
     else if (widget.roomId.isEmpty && oldWidget.roomId.isNotEmpty) {
       if (_pageController.hasClients && (_pageController.page ?? 0) > 0.5) {
-        _animateToPage(0);
+        animateToPage(0);
       } else {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (_pageController.hasClients && (_pageController.page ?? 0) > 0.5) {
-            _animateToPage(0);
+            animateToPage(0);
           }
         });
       }
@@ -196,7 +205,7 @@ class _SwipeableChatLayoutState extends State<SwipeableChatLayout> {
         if (currentPage == 1) {
           // DISCORD STYLE: Just slide back to the list.
           // Keep the group "open" in the background and in the URL.
-          _animateToPage(0);
+          animateToPage(0);
         } else {
           // If we are already at the list, we can allow the app to go back (e.g. to home)
           context.pop();
@@ -215,11 +224,11 @@ class _SwipeableChatLayoutState extends State<SwipeableChatLayout> {
           child: NotificationListener<Notification>(
             onNotification: (notification) {
               if (notification is SwipeBackNotification) {
-                _animateToPage(0);
+                animateToPage(0);
                 return true;
               }
               if (notification is ShowChatNotification) {
-                _animateToPage(1);
+                animateToPage(1);
                 return true;
               }
               return false;
@@ -236,6 +245,7 @@ class _SwipeableChatLayoutState extends State<SwipeableChatLayout> {
                       activeChat: widget.roomId.isEmpty ? null : widget.roomId,
                       activeSpace: spaceId,
                       displayNavigationRail: true,
+                      openInBackground: widget.openInBackground,
                     ),
                   ),
                 ),
