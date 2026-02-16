@@ -213,7 +213,7 @@ class ClientChooserButton extends StatelessWidget {
           context.go('/rooms/settings/addaccount');
           break;
         case SettingsAction.newGroup:
-          context.go('/rooms/newgroup');
+          context.push('/rooms/newgroup');
           break;
         case SettingsAction.invite:
           FluffyShare.shareInviteLink(context);
@@ -222,10 +222,10 @@ class ClientChooserButton extends StatelessWidget {
           launchUrlString(AppConfig.donationUrl);
           break;
         case SettingsAction.settings:
-          context.go('/rooms/settings');
+          context.push('/rooms/settings');
           break;
         case SettingsAction.archive:
-          context.go('/rooms/archive');
+          context.push('/rooms/archive');
           break;
         case SettingsAction.setStatus:
           controller.setStatus();

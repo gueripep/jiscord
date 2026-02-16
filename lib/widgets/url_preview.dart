@@ -424,7 +424,7 @@ class _UrlPreviewState extends State<UrlPreview> {
                       child: Text(
                         metadata.title!,
                         style: theme.textTheme.titleMedium?.copyWith(
-                          color: widget.textColor ?? theme.colorScheme.primary,
+                          color: theme.colorScheme.primary,
                           fontWeight: FontWeight.w600,
                         ),
                         maxLines: 2,

@@ -13,7 +13,7 @@ class StartChatFab extends StatelessWidget {
       heroTag: 'start_chat_fab',
       backgroundColor: Theme.of(context).colorScheme.primary,
       foregroundColor: Theme.of(context).colorScheme.onPrimary,
-      onPressed: () => context.go('/rooms/newprivatechat'),
+      onPressed: () => context.push('/rooms/newprivatechat'),
       tooltip: L10n.of(context).newChat,
       child: const Icon(Icons.edit_square),
     );

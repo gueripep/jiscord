@@ -25,6 +25,7 @@ import 'package:fluffychat/widgets/matrix.dart';
 import 'package:fluffychat/utils/voice/voice_channel_model.dart';
 import 'package:fluffychat/widgets/voice_channel_tile.dart';
 import 'package:fluffychat/pages/voice_channel/voice_channel_dialog.dart';
+import 'package:fluffychat/utils/voice/voice_channel_manager.dart';
 
 enum SpaceChildAction { edit, moveToSpace, removeFromSpace }
 
@@ -366,6 +367,51 @@ class _SpaceViewState extends State<SpaceView> {
     }
   }
 
+  void _showVoiceChannelMenu(VoiceChannel channel) async {
+    final action = await showModalActionPopup<String>(
+      context: context,
+      title: channel.name,
+      actions: [
+        AdaptiveModalAction(value: 'edit', label: L10n.of(context).edit),
+        AdaptiveModalAction(
+          value: 'delete',
+          label: L10n.of(context).delete,
+          isDestructive: true,
+        ),
+      ],
+    );
+
+    if (action == null) return;
+    final room = Matrix.of(context).client.getRoomById(widget.spaceId)!;
+
+    if (action == 'edit') {
+      final result = await VoiceChannelDialog.show(
+        context,
+        room: room,
+        existingChannel: channel,
+      );
+      if (result == true) setState(() {});
+    } else if (action == 'delete') {
+      final confirmed = await showOkCancelAlertDialog(
+        context: context,
+        title: L10n.of(context).areYouSure,
+        message: 'Are you sure you want to delete this voice channel?',
+        okLabel: L10n.of(context).delete,
+        isDestructive: true,
+      );
+      if (confirmed != OkCancelResult.ok) return;
+
+      await showFutureLoadingDialog(
+        context: context,
+        future: () => VoiceChannelManager.deleteChannel(
+          room: room,
+          channelId: channel.id,
+        ),
+      );
+      setState(() {});
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -396,24 +442,6 @@ class _SpaceViewState extends State<SpaceView> {
           ),
         ),
         actions: [
-          if (isAdmin)
-            IconButton(
-              onPressed: _addChat,
-              icon: const Icon(Icons.group_add_outlined),
-              tooltip: L10n.of(context).newGroup,
-            ),
-          if (isAdmin)
-            IconButton(
-              onPressed: () async {
-                final result = await VoiceChannelDialog.show(
-                  context,
-                  room: room!,
-                );
-                if (result == true) setState(() {});
-              },
-              icon: const Icon(Icons.volume_up),
-              tooltip: 'Create Voice Channel',
-            ),
           PopupMenuButton<SpaceActions>(
             useRootNavigator: true,
             onSelected: _onSpaceAction,
@@ -479,6 +507,42 @@ class _SpaceViewState extends State<SpaceView> {
               builder: (context, snapshot) {
                 return CustomScrollView(
                   slivers: [
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 8,
+                        ),
+                        child: Row(
+                          children: [
+                            Text(
+                              'TEXT CHANNELS',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 0.5,
+                                color: theme.colorScheme.onSurface.withValues(
+                                  alpha: 0.5,
+                                ),
+                              ),
+                            ),
+                            const Spacer(),
+                            if (isAdmin)
+                              InkWell(
+                                onTap: _addChat,
+                                borderRadius: BorderRadius.circular(12),
+                                child: Icon(
+                                  Icons.add,
+                                  size: 16,
+                                  color: theme.colorScheme.onSurface.withValues(
+                                    alpha: 0.5,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ),
                     SliverList.builder(
                       itemCount: _discoveredChildren.length + 1,
                       itemBuilder: (context, i) {
@@ -524,83 +588,97 @@ class _SpaceViewState extends State<SpaceView> {
                                 ? theme.colorScheme.secondaryContainer
                                 : Colors.transparent,
                             child: HoverBuilder(
-                              builder: (context, hovered) => ListTile(
-                                visualDensity: const VisualDensity(
-                                  vertical: -0.5,
-                                ),
-                                contentPadding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                ),
-                                onTap: joinedRoom != null
-                                    ? () => widget.onChatTab(joinedRoom!)
-                                    : () => _joinChildRoom(item),
-                                onLongPress: isAdmin
+                              builder: (context, hovered) => GestureDetector(
+                                onSecondaryTap: isAdmin
                                     ? () => _showSpaceChildEditMenu(
                                         context,
                                         item.roomId,
                                       )
                                     : null,
-                                leading: hovered && isAdmin
-                                    ? SizedBox.square(
-                                        dimension: avatarSize,
-                                        child: IconButton(
-                                          splashRadius: avatarSize,
-                                          iconSize: 14,
-                                          style: IconButton.styleFrom(
-                                            foregroundColor: theme
-                                                .colorScheme
-                                                .onTertiaryContainer,
-                                            backgroundColor: theme
-                                                .colorScheme
-                                                .tertiaryContainer,
+                                child: ListTile(
+                                  visualDensity: const VisualDensity(
+                                    vertical: -0.5,
+                                  ),
+                                  contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                  ),
+                                  onTap: joinedRoom != null
+                                      ? () => widget.onChatTab(joinedRoom!)
+                                      : () => _joinChildRoom(item),
+                                  onLongPress: isAdmin
+                                      ? () => _showSpaceChildEditMenu(
+                                          context,
+                                          item.roomId,
+                                        )
+                                      : null,
+                                  leading: hovered && isAdmin
+                                      ? SizedBox.square(
+                                          dimension: avatarSize,
+                                          child: IconButton(
+                                            splashRadius: avatarSize,
+                                            iconSize: 14,
+                                            style: IconButton.styleFrom(
+                                              foregroundColor: theme
+                                                  .colorScheme
+                                                  .onTertiaryContainer,
+                                              backgroundColor: theme
+                                                  .colorScheme
+                                                  .tertiaryContainer,
+                                            ),
+                                            onPressed: () =>
+                                                _showSpaceChildEditMenu(
+                                                  context,
+                                                  item.roomId,
+                                                ),
+                                            icon: const Icon(
+                                              Icons.edit_outlined,
+                                            ),
                                           ),
-                                          onPressed: () =>
-                                              _showSpaceChildEditMenu(
-                                                context,
-                                                item.roomId,
-                                              ),
-                                          icon: const Icon(Icons.edit_outlined),
+                                        )
+                                      : Avatar(
+                                          size: avatarSize,
+                                          mxContent: item.avatarUrl,
+                                          name: '#',
+                                          backgroundColor: theme
+                                              .colorScheme
+                                              .surfaceContainer,
+                                          textColor:
+                                              item.name?.darkColor ??
+                                              theme.colorScheme.onSurface,
+                                          border: item.roomType == 'm.space'
+                                              ? BorderSide(
+                                                  color: theme
+                                                      .colorScheme
+                                                      .surfaceContainerHighest,
+                                                )
+                                              : null,
+                                          borderRadius:
+                                              item.roomType == 'm.space'
+                                              ? BorderRadius.circular(
+                                                  AppConfig.borderRadius / 4,
+                                                )
+                                              : null,
                                         ),
-                                      )
-                                    : Avatar(
-                                        size: avatarSize,
-                                        mxContent: item.avatarUrl,
-                                        name: '#',
-                                        backgroundColor:
-                                            theme.colorScheme.surfaceContainer,
-                                        textColor:
-                                            item.name?.darkColor ??
-                                            theme.colorScheme.onSurface,
-                                        border: item.roomType == 'm.space'
-                                            ? BorderSide(
-                                                color: theme
-                                                    .colorScheme
-                                                    .surfaceContainerHighest,
-                                              )
-                                            : null,
-                                        borderRadius: item.roomType == 'm.space'
-                                            ? BorderRadius.circular(
-                                                AppConfig.borderRadius / 4,
-                                              )
-                                            : null,
-                                      ),
-                                title: Row(
-                                  children: [
-                                    Expanded(
-                                      child: Opacity(
-                                        opacity: joinedRoom == null ? 0.5 : 1,
-                                        child: Text(
-                                          displayname,
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
+                                  title: Row(
+                                    children: [
+                                      Expanded(
+                                        child: Opacity(
+                                          opacity: joinedRoom == null ? 0.5 : 1,
+                                          child: Text(
+                                            displayname,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
                                         ),
                                       ),
-                                    ),
-                                    if (joinedRoom != null)
-                                      UnreadBubble(room: joinedRoom)
-                                    else
-                                      const Icon(Icons.chevron_right_outlined),
-                                  ],
+                                      if (joinedRoom != null)
+                                        UnreadBubble(room: joinedRoom)
+                                      else
+                                        const Icon(
+                                          Icons.chevron_right_outlined,
+                                        ),
+                                    ],
+                                  ),
                                 ),
                               ),
                             ),
@@ -661,7 +739,15 @@ class _SpaceViewState extends State<SpaceView> {
                                 ),
                               ),
                               ...voiceChannels.map(
-                                (ch) => VoiceChannelTile(channel: ch),
+                                (ch) => VoiceChannelTile(
+                                  channel: ch,
+                                  onLongPress: isAdmin
+                                      ? () => _showVoiceChannelMenu(ch)
+                                      : null,
+                                  onSecondaryTap: isAdmin
+                                      ? () => _showVoiceChannelMenu(ch)
+                                      : null,
+                                ),
                               ),
                             ],
                           );

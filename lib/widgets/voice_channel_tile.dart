@@ -10,8 +10,15 @@ import 'package:fluffychat/widgets/voice_participant_tile.dart';
 /// list when expanded. Tapping joins the channel.
 class VoiceChannelTile extends StatelessWidget {
   final VoiceChannel channel;
+  final void Function()? onLongPress;
+  final void Function()? onSecondaryTap;
 
-  const VoiceChannelTile({required this.channel, super.key});
+  const VoiceChannelTile({
+    required this.channel,
+    this.onLongPress,
+    this.onSecondaryTap,
+    super.key,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -34,6 +41,8 @@ class VoiceChannelTile extends StatelessWidget {
                 if (isActive) return; // Already in this channel
                 voiceController.join(channel.id, channel.name, channel.roomId);
               },
+              onLongPress: onLongPress,
+              onSecondaryTap: onSecondaryTap,
               borderRadius: BorderRadius.circular(8),
               child: Padding(
                 padding: const EdgeInsets.symmetric(

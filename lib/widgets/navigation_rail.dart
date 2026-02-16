@@ -7,7 +7,7 @@ import 'package:fluffychat/config/app_config.dart';
 import 'package:fluffychat/config/themes.dart';
 import 'package:fluffychat/l10n/l10n.dart';
 import 'package:fluffychat/pages/chat_list/navi_rail_item.dart';
-import 'package:fluffychat/pages/chat_list/start_chat_fab.dart';
+
 import 'package:fluffychat/utils/matrix_sdk_extensions/matrix_locals.dart';
 import 'package:fluffychat/utils/stream_extension.dart';
 import 'package:fluffychat/widgets/avatar.dart';
@@ -71,7 +71,7 @@ class SpacesNavigationRail extends StatelessWidget {
                         if (i == allSpaces.length) {
                           return NaviRailItem(
                             isSelected: false,
-                            onTap: () => context.go('/rooms/newspace'),
+                            onTap: () => context.push('/rooms/newspace'),
                             icon: const Padding(
                               padding: EdgeInsets.all(8.0),
                               child: Icon(Icons.add),
@@ -107,10 +107,6 @@ class SpacesNavigationRail extends StatelessWidget {
                         );
                       },
                     ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.all(12.0),
-                    child: StartChatFab(),
                   ),
                 ],
               ),

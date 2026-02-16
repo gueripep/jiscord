@@ -140,6 +140,9 @@ abstract class AppRoutes {
       pageBuilder: (context, state, child) {
         final isSettings =
             state.fullPath?.startsWith('/rooms/settings') == true;
+        final isNewPage =
+            state.fullPath?.startsWith('/rooms/new') == true ||
+            state.fullPath?.startsWith('/rooms/archive') == true;
         final isColumnMode = FluffyThemes.isColumnMode(context);
 
         if (isColumnMode) {
@@ -161,7 +164,7 @@ abstract class AppRoutes {
         }
 
         // Mobile / Swipeable mode
-        if (!isSettings) {
+        if (!isSettings && !isNewPage) {
           return noTransitionPageBuilder(
             context,
             state,

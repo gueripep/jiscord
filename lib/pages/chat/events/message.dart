@@ -297,9 +297,7 @@ class Message extends StatelessWidget {
                                       ? Colors.transparent
                                       : null,
                                   enableFeedback: !selected,
-                                  onTap: longPressSelect
-                                      ? null
-                                      : () => onSelect(event),
+                                  onTap: null,
                                   borderRadius: BorderRadius.circular(
                                     AppConfig.borderRadius / 2,
                                   ),
@@ -450,6 +448,11 @@ class Message extends StatelessWidget {
                                                 ? null
                                                 : () {
                                                     HapticFeedback.heavyImpact();
+                                                    onSelect(event);
+                                                  },
+                                            onSecondaryTap: longPressSelect
+                                                ? null
+                                                : () {
                                                     onSelect(event);
                                                   },
                                             child: AnimatedOpacity(

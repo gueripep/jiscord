@@ -151,7 +151,7 @@ class NewPrivateChatView extends StatelessWidget {
                               child: const Icon(Icons.group_add_outlined),
                             ),
                             title: Text(L10n.of(context).createGroup),
-                            onTap: () => context.go('/rooms/newgroup'),
+                            onTap: () => context.push('/rooms/newgroup'),
                           ),
                           if (PlatformInfos.isMobile)
                             ListTile(
