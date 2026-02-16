@@ -5,6 +5,7 @@ import 'package:matrix/matrix.dart';
 
 import 'package:fluffychat/config/setting_keys.dart';
 import 'package:fluffychat/l10n/l10n.dart';
+import 'package:fluffychat/pages/chat/swipeable_chat_layout.dart';
 import 'package:fluffychat/pages/chat_list/chat_list.dart';
 import 'package:fluffychat/pages/chat_list/chat_list_item.dart';
 import 'package:fluffychat/pages/chat_list/dummy_chat_list_item.dart';
@@ -58,10 +59,14 @@ class ChatListViewBody extends StatelessWidget {
     final userSearchResult = controller.userSearchResult;
     const dummyChatCount = 4;
     final filter = controller.searchController.text.toLowerCase();
+    final transitionNotifier = SwipeableChatLayoutTransition.maybeOf(
+      context,
+    )?.isTransitioning;
+
     return StreamBuilder(
       key: ValueKey(client.userID.toString()),
       stream: client.onSync.stream
-          .where((s) => s.hasRoomUpdate)
+          .where((s) => s.hasRoomUpdate && transitionNotifier?.value != true)
           .rateLimit(const Duration(seconds: 1)),
       builder: (context, _) {
         final rooms = controller.filteredRooms;

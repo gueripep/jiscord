@@ -76,7 +76,7 @@ class ChatList extends StatefulWidget {
 }
 
 class ChatListController extends State<ChatList>
-    with TickerProviderStateMixin, RouteAware {
+    with TickerProviderStateMixin, RouteAware, AutomaticKeepAliveClientMixin {
   StreamSubscription? _intentDataStreamSubscription;
 
   StreamSubscription? _intentFileStreamSubscription;
@@ -416,6 +416,7 @@ class ChatListController extends State<ChatList>
     super.didUpdateWidget(oldWidget);
     if (oldWidget.activeChat != widget.activeChat ||
         oldWidget.activeSpace != widget.activeSpace) {
+      _activeSpaceId = widget.activeSpace;
       _savePersistentState();
     }
   }
@@ -894,7 +895,13 @@ class ChatListController extends State<ChatList>
   }
 
   @override
-  Widget build(BuildContext context) => ChatListView(this);
+  bool get wantKeepAlive => true;
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    return ChatListView(this);
+  }
 
   void _hackyWebRTCFixForWeb() {
     ChatList.contextForVoip = context;

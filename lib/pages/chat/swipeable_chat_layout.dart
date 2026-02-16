@@ -179,15 +179,16 @@ class _SwipeableChatLayoutState extends State<SwipeableChatLayout> {
             },
             child: PageView(
               controller: _pageController,
-              physics: const BouncingScrollPhysics(),
+              physics: const ClampingScrollPhysics(),
               children: [
-                ChatList(
-                  key: ValueKey('swipeable_chat_list_${spaceId ?? 'all'}'),
-                  activeChat: widget.roomId.isEmpty ? null : widget.roomId,
-                  activeSpace: spaceId,
-                  displayNavigationRail: true,
+                RepaintBoundary(
+                  child: ChatList(
+                    activeChat: widget.roomId.isEmpty ? null : widget.roomId,
+                    activeSpace: spaceId,
+                    displayNavigationRail: true,
+                  ),
                 ),
-                widget.chatPage,
+                RepaintBoundary(child: widget.chatPage),
               ],
             ),
           ),

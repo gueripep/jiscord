@@ -56,7 +56,7 @@ class ChatEventList extends StatelessWidget {
         builder: (context, isTransitioning, _) {
           return ListView.custom(
             cacheExtent: isTransitioning
-                ? 500
+                ? 0
                 : 3000, // Large cache to stabilize scrollbar and pre-render embeds
             // Desktop: hard stop at edges (no overscroll bounce)
             // Mobile: natural iOS/Android overscroll behavior
