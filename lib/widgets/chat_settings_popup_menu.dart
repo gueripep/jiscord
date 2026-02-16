@@ -91,7 +91,14 @@ class ChatSettingsPopupMenuState extends State<ChatSettingsPopupMenu> {
                 _showChatDetails();
                 break;
               case ChatPopupMenuActions.search:
-                context.go('/rooms/${widget.room.id}/search');
+                context.go(
+                  Uri(
+                    path: '/rooms/${widget.room.id}/search',
+                    queryParameters: GoRouterState.of(
+                      context,
+                    ).uri.queryParameters,
+                  ).toString(),
+                );
                 break;
               case ChatPopupMenuActions.emote:
                 goToEmoteSettings();
@@ -168,10 +175,21 @@ class ChatSettingsPopupMenuState extends State<ChatSettingsPopupMenu> {
   }
 
   void _showChatDetails() {
-    if (GoRouterState.of(context).uri.path.endsWith('/details')) {
-      context.go('/rooms/${widget.room.id}');
+    final state = GoRouterState.of(context);
+    if (state.uri.path.endsWith('/details')) {
+      context.go(
+        Uri(
+          path: '/rooms/${widget.room.id}',
+          queryParameters: state.uri.queryParameters,
+        ).toString(),
+      );
     } else {
-      context.go('/rooms/${widget.room.id}/details');
+      context.go(
+        Uri(
+          path: '/rooms/${widget.room.id}/details',
+          queryParameters: state.uri.queryParameters,
+        ).toString(),
+      );
     }
   }
 }

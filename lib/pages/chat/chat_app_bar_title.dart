@@ -35,7 +35,14 @@ class ChatAppBarTitle extends StatelessWidget {
           ? null
           : () => FluffyThemes.isThreeColumnMode(context)
                 ? controller.toggleDisplayChatDetailsColumn()
-                : context.go('/rooms/${room.id}/details'),
+                : context.go(
+                    Uri(
+                      path: '/rooms/${room.id}/details',
+                      queryParameters: GoRouterState.of(
+                        context,
+                      ).uri.queryParameters,
+                    ).toString(),
+                  ),
       child: Row(
         children: [
           Hero(

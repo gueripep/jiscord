@@ -147,13 +147,24 @@ abstract class AppRoutes {
 
         if (isColumnMode) {
           if (!isSettings) {
+            var spaceId = state.uri.queryParameters['spaceId'];
+            final roomId = state.pathParameters['roomid'];
+            if (spaceId == null && roomId != null) {
+              final room = Matrix.of(context).client.getRoomById(roomId);
+              if (room != null) {
+                final parents = room.spaceParents;
+                if (parents.isNotEmpty) {
+                  spaceId = parents.first.roomId;
+                }
+              }
+            }
             return noTransitionPageBuilder(
               context,
               state,
               TwoColumnLayout(
                 mainView: ChatList(
-                  activeChat: state.pathParameters['roomid'],
-                  activeSpace: state.uri.queryParameters['spaceId'],
+                  activeChat: roomId,
+                  activeSpace: spaceId,
                   displayNavigationRail: true,
                 ),
                 sideView: child,
