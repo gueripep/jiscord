@@ -28,10 +28,29 @@ extension DateTimeExtension on DateTime {
   bool sameEnvironment(DateTime prevTime) =>
       difference(prevTime) < const Duration(hours: 1);
 
+  static final Map<String, DateFormat> _timeFormatCache = {};
+  static final Map<String, DateFormat> _timeFormatAmPmCache = {};
+  static final Map<String, DateFormat> _dayFormatCache = {};
+  static final Map<String, DateFormat> _monthDayFormatCache = {};
+  static final Map<String, DateFormat> _yearMonthDayFormatCache = {};
+
   /// Returns a simple time String.
-  String localizedTimeOfDay(BuildContext context) => use24HourFormat(context)
-      ? DateFormat('HH:mm', L10n.of(context).localeName).format(this)
-      : DateFormat('h:mm a', L10n.of(context).localeName).format(this);
+  String localizedTimeOfDay(BuildContext context) {
+    final locale = L10n.of(context).localeName;
+    if (use24HourFormat(context)) {
+      final format = _timeFormatCache.putIfAbsent(
+        locale,
+        () => DateFormat('HH:mm', locale),
+      );
+      return format.format(this);
+    } else {
+      final format = _timeFormatAmPmCache.putIfAbsent(
+        locale,
+        () => DateFormat('h:mm a', locale),
+      );
+      return format.format(this);
+    }
+  }
 
   /// Returns [localizedTimeOfDay()] if the ChatTime is today, the name of the week
   /// day if the ChatTime is this week and a date string else.
@@ -48,20 +67,28 @@ extension DateTimeExtension on DateTime {
         now.millisecondsSinceEpoch - millisecondsSinceEpoch <
             1000 * 60 * 60 * 24 * 7;
 
+    final languageCode = Localizations.localeOf(context).languageCode;
+
     if (sameDay) {
       return localizedTimeOfDay(context);
     } else if (sameWeek) {
-      return DateFormat.E(
-        Localizations.localeOf(context).languageCode,
-      ).format(this);
+      final format = _dayFormatCache.putIfAbsent(
+        languageCode,
+        () => DateFormat.E(languageCode),
+      );
+      return format.format(this);
     } else if (sameYear) {
-      return DateFormat.MMMd(
-        Localizations.localeOf(context).languageCode,
-      ).format(this);
+      final format = _monthDayFormatCache.putIfAbsent(
+        languageCode,
+        () => DateFormat.MMMd(languageCode),
+      );
+      return format.format(this);
     }
-    return DateFormat.yMMMd(
-      Localizations.localeOf(context).languageCode,
-    ).format(this);
+    final format = _yearMonthDayFormatCache.putIfAbsent(
+      languageCode,
+      () => DateFormat.yMMMd(languageCode),
+    );
+    return format.format(this);
   }
 
   /// If the DateTime is today, this returns [localizedTimeOfDay()], if not it also

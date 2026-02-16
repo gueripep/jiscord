@@ -508,9 +508,22 @@ class HtmlMessage extends StatelessWidget {
     }
   }
 
+  static final Map<String, dom.Element> _htmlCache = {};
+
   @override
   Widget build(BuildContext context) {
-    final element = parser.parse(html).body ?? dom.Element.html('');
+    var element = _htmlCache[html];
+    if (element == null) {
+      // ignore: avoid_print
+      print('Parsing HTML for ${html.length} chars');
+      element = parser.parse(html).body;
+      if (element != null) {
+        _htmlCache[html] = element;
+      }
+    }
+    // Fallback if parsing failed or body is null
+    element ??= dom.Element.html('');
+
     return Text.rich(
       _renderHtml(element, context),
       style: TextStyle(fontSize: fontSize, color: textColor),

@@ -1,5 +1,8 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 
+import 'package:flutter_displaymode/flutter_displaymode.dart';
 import 'package:go_router/go_router.dart';
 import 'package:matrix/matrix.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -14,7 +17,7 @@ import '../utils/custom_scroll_behaviour.dart';
 import 'matrix.dart';
 import 'voice_channel_bar.dart';
 
-class FluffyChatApp extends StatelessWidget {
+class FluffyChatApp extends StatefulWidget {
   final Widget? testWidget;
   final List<Client> clients;
   final String? pincode;
@@ -41,6 +44,27 @@ class FluffyChatApp extends StatelessWidget {
   );
 
   @override
+  State<FluffyChatApp> createState() => _FluffyChatAppState();
+}
+
+class _FluffyChatAppState extends State<FluffyChatApp> {
+  @override
+  void initState() {
+    super.initState();
+    _setHighRefreshRate();
+  }
+
+  Future<void> _setHighRefreshRate() async {
+    if (Platform.isAndroid) {
+      try {
+        await FlutterDisplayMode.setHighRefreshRate();
+      } catch (e) {
+        // Fail silently
+      }
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     return ThemeBuilder(
       builder: (context, themeMode, primaryColor) => MaterialApp.router(
@@ -55,18 +79,20 @@ class FluffyChatApp extends StatelessWidget {
         scrollBehavior: CustomScrollBehavior(),
         localizationsDelegates: L10n.localizationsDelegates,
         supportedLocales: L10n.supportedLocales,
-        routerConfig: router,
+        routerConfig: FluffyChatApp.router,
         builder: (context, child) => AppLockWidget(
-          pincode: pincode,
-          clients: clients,
+          pincode: widget.pincode,
+          clients: widget.clients,
           // Need a navigator above the Matrix widget for
           // displaying dialogs
           child: Matrix(
-            clients: clients,
-            store: store,
+            clients: widget.clients,
+            store: widget.store,
             child: Column(
               children: [
-                Expanded(child: testWidget ?? child ?? const SizedBox.shrink()),
+                Expanded(
+                  child: widget.testWidget ?? child ?? const SizedBox.shrink(),
+                ),
                 const Material(child: VoiceChannelBar()),
               ],
             ),

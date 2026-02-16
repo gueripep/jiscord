@@ -331,37 +331,25 @@ class MessageContent extends StatelessWidget {
           linkColor: linkColor,
         );
       case EventTypes.CallInvite:
-        return FutureBuilder<User?>(
-          future: event.fetchSenderUser(),
-          builder: (context, snapshot) {
-            return _ButtonContent(
-              label: L10n.of(context).startedACall(
-                snapshot.data?.calcDisplayname() ??
-                    event.senderFromMemoryOrFallback.calcDisplayname(),
-              ),
-              icon: '📞',
-              textColor: buttonTextColor,
-              onPressed: () => onInfoTab!(event),
-              fontSize: fontSize,
-            );
-          },
+        return _ButtonContent(
+          label: L10n.of(
+            context,
+          ).startedACall(event.senderFromMemoryOrFallback.calcDisplayname()),
+          icon: '📞',
+          textColor: buttonTextColor,
+          onPressed: () => onInfoTab!(event),
+          fontSize: fontSize,
         );
       default:
-        return FutureBuilder<User?>(
-          future: event.fetchSenderUser(),
-          builder: (context, snapshot) {
-            return _ButtonContent(
-              label: L10n.of(context).userSentUnknownEvent(
-                snapshot.data?.calcDisplayname() ??
-                    event.senderFromMemoryOrFallback.calcDisplayname(),
-                event.type,
-              ),
-              icon: 'ℹ️',
-              textColor: buttonTextColor,
-              onPressed: () => onInfoTab!(event),
-              fontSize: fontSize,
-            );
-          },
+        return _ButtonContent(
+          label: L10n.of(context).userSentUnknownEvent(
+            event.senderFromMemoryOrFallback.calcDisplayname(),
+            event.type,
+          ),
+          icon: 'ℹ️',
+          textColor: buttonTextColor,
+          onPressed: () => onInfoTab!(event),
+          fontSize: fontSize,
         );
     }
   }
@@ -383,24 +371,19 @@ class RedactionWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<User?>(
-      future: event.redactedBecause?.fetchSenderUser(),
-      builder: (context, snapshot) {
-        final reason = event.redactedBecause?.content.tryGet<String>('reason');
-        final redactedBy =
-            snapshot.data?.calcDisplayname() ??
-            event.redactedBecause?.senderId.localpart ??
-            L10n.of(context).user;
-        return _ButtonContent(
-          label: reason == null
-              ? L10n.of(context).redactedBy(redactedBy)
-              : L10n.of(context).redactedByBecause(redactedBy, reason),
-          icon: '🗑️',
-          textColor: buttonTextColor.withAlpha(128),
-          onPressed: () => onInfoTab!(event),
-          fontSize: fontSize,
-        );
-      },
+    final reason = event.redactedBecause?.content.tryGet<String>('reason');
+    final redactedBy =
+        event.redactedBecause?.senderFromMemoryOrFallback.calcDisplayname() ??
+        event.redactedBecause?.senderId.localpart ??
+        L10n.of(context).user;
+    return _ButtonContent(
+      label: reason == null
+          ? L10n.of(context).redactedBy(redactedBy)
+          : L10n.of(context).redactedByBecause(redactedBy, reason),
+      icon: '🗑️',
+      textColor: buttonTextColor.withAlpha(128),
+      onPressed: () => onInfoTab!(event),
+      fontSize: fontSize,
     );
   }
 }

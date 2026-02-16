@@ -206,10 +206,14 @@ class ChatView extends StatelessWidget {
                       ? null
                       : theme.colorScheme.onTertiaryContainer,
                 ),
+                scrolledUnderElevation: 0,
+                shape: Border(
+                  bottom: BorderSide(color: theme.dividerColor, width: 1),
+                ),
                 backgroundColor: controller.selectedEvents.isEmpty
                     ? controller.activeThreadId != null
                           ? theme.colorScheme.secondaryContainer
-                          : null
+                          : theme.scaffoldBackgroundColor
                     : theme.colorScheme.tertiaryContainer,
                 automaticallyImplyLeading: false,
                 leading: controller.selectMode
