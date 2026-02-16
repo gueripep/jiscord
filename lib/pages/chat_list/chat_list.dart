@@ -152,7 +152,20 @@ class ChatListController extends State<ChatList>
       case ActiveFilter.allChats:
         return (room) => true;
       case ActiveFilter.messages:
-        return (room) => !room.isSpace && room.isDirectChat;
+        final spaces = Matrix.of(context).client.rooms.where((r) => r.isSpace);
+        final spaceChildrenIds = <String>{};
+        for (final space in spaces) {
+          for (final child in space.spaceChildren) {
+            if (child.roomId != null) {
+              spaceChildrenIds.add(child.roomId!);
+            }
+          }
+        }
+        return (room) {
+          if (room.isSpace) return false;
+          if (room.isDirectChat) return true;
+          return !spaceChildrenIds.contains(room.id);
+        };
       case ActiveFilter.groups:
         return (room) => !room.isSpace && !room.isDirectChat;
       case ActiveFilter.unread:
