@@ -7,6 +7,7 @@ import 'package:fluffychat/config/app_config.dart';
 import 'package:fluffychat/config/themes.dart';
 import 'package:fluffychat/l10n/l10n.dart';
 import 'package:fluffychat/pages/chat_list/navi_rail_item.dart';
+import 'package:fluffychat/pages/chat/swipeable_chat_layout.dart';
 
 import 'package:fluffychat/utils/matrix_sdk_extensions/matrix_locals.dart';
 import 'package:fluffychat/utils/stream_extension.dart';
@@ -28,12 +29,17 @@ class SpacesNavigationRail extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final client = Matrix.of(context).client;
+    final transitionNotifier = SwipeableChatLayoutTransition.maybeOf(
+      context,
+    )?.isTransitioning;
     return Material(
       child: SafeArea(
         child: StreamBuilder(
           key: ValueKey(client.userID.toString()),
           stream: client.onSync.stream
-              .where((s) => s.hasRoomUpdate)
+              .where(
+                (s) => s.hasRoomUpdate && transitionNotifier?.value != true,
+              )
               .rateLimit(const Duration(seconds: 1)),
           builder: (context, _) {
             final allSpaces = client.rooms

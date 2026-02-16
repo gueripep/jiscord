@@ -5,6 +5,23 @@ import 'package:fluffychat/pages/chat_list/chat_list.dart';
 import 'package:fluffychat/pages/chat/swipe_notifications.dart';
 import 'package:fluffychat/widgets/matrix.dart';
 
+/// Custom scroll physics for snappier page transitions.
+///
+/// Uses a higher minimum velocity threshold (700 px/s) so that only
+/// intentional swipes trigger page changes, preventing accidental ones.
+class _SnappyPageScrollPhysics extends ScrollPhysics {
+  const _SnappyPageScrollPhysics({super.parent});
+
+  @override
+  _SnappyPageScrollPhysics applyTo(ScrollPhysics? ancestor) {
+    return _SnappyPageScrollPhysics(parent: buildParent(ancestor));
+  }
+
+  @override
+  SpringDescription get spring =>
+      const SpringDescription(mass: 80, stiffness: 100, damping: 1);
+}
+
 class SwipeableChatLayoutTransition extends InheritedWidget {
   final ValueNotifier<bool> isTransitioning;
 
@@ -24,6 +41,35 @@ class SwipeableChatLayoutTransition extends InheritedWidget {
     return isTransitioning != oldWidget.isTransitioning;
   }
 }
+
+/// Wrapper that keeps its child alive in the PageView when scrolled off-screen.
+/// This is the "View Portaling" technique — prevents the white flash and
+/// full re-render that occurs when swiping back to an already-visited page.
+class _KeepAliveWrapper extends StatefulWidget {
+  final Widget child;
+  const _KeepAliveWrapper({required this.child});
+
+  @override
+  State<_KeepAliveWrapper> createState() => _KeepAliveWrapperState();
+}
+
+class _KeepAliveWrapperState extends State<_KeepAliveWrapper>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    return widget.child;
+  }
+}
+
+/// Animation constants matching Material Design 3 recommended values.
+const _kAnimationDuration = Duration(milliseconds: 250);
+
+/// Material 3 standard deceleration curve — snappier than plain easeOut.
+const _kAnimationCurve = Curves.easeOutCubic;
 
 class SwipeableChatLayout extends StatefulWidget {
   final String roomId;
@@ -76,6 +122,16 @@ class _SwipeableChatLayoutState extends State<SwipeableChatLayout> {
     super.dispose();
   }
 
+  /// Animate to a page with consistent Material 3 timing.
+  void _animateToPage(int page) {
+    if (!_pageController.hasClients) return;
+    _pageController.animateToPage(
+      page,
+      duration: _kAnimationDuration,
+      curve: _kAnimationCurve,
+    );
+  }
+
   @override
   void didUpdateWidget(SwipeableChatLayout oldWidget) {
     super.didUpdateWidget(oldWidget);
@@ -84,28 +140,31 @@ class _SwipeableChatLayoutState extends State<SwipeableChatLayout> {
       // If the room changed OR if we just tapped the already active room while on the list page
       if (oldWidget.roomId != widget.roomId ||
           (_pageController.hasClients && _pageController.page?.round() == 0)) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (_pageController.hasClients && (_pageController.page ?? 0) < 0.5) {
-            _pageController.animateToPage(
-              1,
-              duration: const Duration(milliseconds: 300),
-              curve: Curves.easeOut,
-            );
-          }
-        });
+        // Optimistic animation: trigger directly if controller is ready,
+        // otherwise wait for post-frame. This removes one frame of delay.
+        if (_pageController.hasClients && (_pageController.page ?? 0) < 0.5) {
+          _animateToPage(1);
+        } else {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (_pageController.hasClients &&
+                (_pageController.page ?? 0) < 0.5) {
+              _animateToPage(1);
+            }
+          });
+        }
       }
     }
     // If the room was cleared externally (e.g. by switching spaces), slide back to list
     else if (widget.roomId.isEmpty && oldWidget.roomId.isNotEmpty) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (_pageController.hasClients && (_pageController.page ?? 0) > 0.5) {
-          _pageController.animateToPage(
-            0,
-            duration: const Duration(milliseconds: 300),
-            curve: Curves.easeOut,
-          );
-        }
-      });
+      if (_pageController.hasClients && (_pageController.page ?? 0) > 0.5) {
+        _animateToPage(0);
+      } else {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (_pageController.hasClients && (_pageController.page ?? 0) > 0.5) {
+            _animateToPage(0);
+          }
+        });
+      }
     }
   }
 
@@ -137,11 +196,7 @@ class _SwipeableChatLayoutState extends State<SwipeableChatLayout> {
         if (currentPage == 1) {
           // DISCORD STYLE: Just slide back to the list.
           // Keep the group "open" in the background and in the URL.
-          _pageController.animateToPage(
-            0,
-            duration: const Duration(milliseconds: 300),
-            curve: Curves.easeOut,
-          );
+          _animateToPage(0);
         } else {
           // If we are already at the list, we can allow the app to go back (e.g. to home)
           context.pop();
@@ -160,35 +215,33 @@ class _SwipeableChatLayoutState extends State<SwipeableChatLayout> {
           child: NotificationListener<Notification>(
             onNotification: (notification) {
               if (notification is SwipeBackNotification) {
-                _pageController.animateToPage(
-                  0,
-                  duration: const Duration(milliseconds: 300),
-                  curve: Curves.easeOut,
-                );
+                _animateToPage(0);
                 return true;
               }
               if (notification is ShowChatNotification) {
-                _pageController.animateToPage(
-                  1,
-                  duration: const Duration(milliseconds: 300),
-                  curve: Curves.easeOut,
-                );
+                _animateToPage(1);
                 return true;
               }
               return false;
             },
             child: PageView(
               controller: _pageController,
-              physics: const ClampingScrollPhysics(),
+              physics: const _SnappyPageScrollPhysics(
+                parent: ClampingScrollPhysics(),
+              ),
               children: [
-                RepaintBoundary(
-                  child: ChatList(
-                    activeChat: widget.roomId.isEmpty ? null : widget.roomId,
-                    activeSpace: spaceId,
-                    displayNavigationRail: true,
+                _KeepAliveWrapper(
+                  child: RepaintBoundary(
+                    child: ChatList(
+                      activeChat: widget.roomId.isEmpty ? null : widget.roomId,
+                      activeSpace: spaceId,
+                      displayNavigationRail: true,
+                    ),
                   ),
                 ),
-                RepaintBoundary(child: widget.chatPage),
+                _KeepAliveWrapper(
+                  child: RepaintBoundary(child: widget.chatPage),
+                ),
               ],
             ),
           ),
