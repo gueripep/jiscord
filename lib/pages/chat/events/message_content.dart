@@ -23,7 +23,6 @@ import 'audio_player.dart';
 import 'cute_events.dart';
 import 'html_message.dart';
 import 'image_bubble.dart';
-import 'package:flutter_linkify/flutter_linkify.dart';
 import 'package:linkify/linkify.dart';
 import 'map_bubble.dart';
 import 'message_download_content.dart';
