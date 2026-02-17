@@ -19,7 +19,6 @@
 
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 import 'dart:isolate';
 import 'dart:ui';
 
@@ -136,7 +135,7 @@ class BackgroundPush {
       //<GOOGLE_SERVICES>    flutterLocalNotificationsPlugin: _flutterLocalNotificationsPlugin,
       //<GOOGLE_SERVICES>  ),
       //<GOOGLE_SERVICES>);
-      if (Platform.isAndroid) {
+      if (PlatformInfos.isAndroid) {
         await UnifiedPush.initialize(
           onNewEndpoint: _newUpEndpoint,
           onRegistrationFailed: (_, i) => _upUnregistered(i),
@@ -173,7 +172,7 @@ class BackgroundPush {
     await _flutterLocalNotificationsPlugin.cancel(id: roomId.hashCode);
 
     // Workaround for app icon badge not updating
-    if (Platform.isIOS) {
+    if (PlatformInfos.isIOS) {
       final unreadCount = client.rooms
           .where((room) => room.isUnreadOrInvited && room.id != roomId)
           .length;
@@ -285,9 +284,9 @@ class BackgroundPush {
     }
   }
 
-  final pusherDataMessageFormat = Platform.isAndroid
+  final pusherDataMessageFormat = PlatformInfos.isAndroid
       ? 'android'
-      : Platform.isIOS
+      : PlatformInfos.isIOS
       ? 'ios'
       : null;
 

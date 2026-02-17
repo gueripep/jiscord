@@ -23,7 +23,7 @@ import 'widgets/fluffy_chat_app.dart';
 ReceivePort? mainIsolateReceivePort;
 
 void main() async {
-  if (Platform.isWindows) {
+  if (PlatformInfos.isWindows) {
     // Workaround for sqlcipher_flutter_libs expecting libsqlcipher.dll
     final exePath = Platform.resolvedExecutable;
     final exeDir = p.dirname(exePath);

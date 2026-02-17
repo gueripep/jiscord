@@ -18,6 +18,7 @@ import 'package:fluffychat/utils/error_reporter.dart';
 import 'package:fluffychat/utils/file_description.dart';
 import 'package:fluffychat/utils/localized_exception_extension.dart';
 import 'package:fluffychat/utils/url_launcher.dart';
+import '../../../utils/platform_infos.dart';
 import '../../../utils/matrix_sdk_extensions/event_extension.dart';
 import '../../../widgets/fluffy_chat_app.dart';
 import '../../../widgets/matrix.dart';
@@ -175,7 +176,7 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
 
         await file.writeAsBytes(matrixFile.bytes);
 
-        if (Platform.isIOS &&
+        if (PlatformInfos.isIOS &&
             matrixFile.mimeType.toLowerCase() == 'audio/ogg') {
           Logs().v('Convert ogg audio file for iOS...');
           final convertedFile = File('${file.path}.caf');

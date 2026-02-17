@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 
 import 'package:flutter_displaymode/flutter_displaymode.dart';
@@ -13,6 +11,7 @@ import 'package:fluffychat/config/themes.dart';
 import 'package:fluffychat/l10n/l10n.dart';
 import 'package:fluffychat/widgets/app_lock.dart';
 import 'package:fluffychat/widgets/theme_builder.dart';
+import '../utils/platform_infos.dart';
 import '../utils/custom_scroll_behaviour.dart';
 import 'matrix.dart';
 import 'voice_channel_bar.dart';
@@ -55,7 +54,7 @@ class _FluffyChatAppState extends State<FluffyChatApp> {
   }
 
   Future<void> _setHighRefreshRate() async {
-    if (Platform.isAndroid) {
+    if (PlatformInfos.isAndroid) {
       try {
         await FlutterDisplayMode.setHighRefreshRate();
       } catch (e) {

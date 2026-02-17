@@ -1,11 +1,11 @@
 import 'dart:async';
-import 'dart:io';
 
 import 'package:flutter/material.dart';
 
 import 'package:qr_code_scanner_plus/qr_code_scanner_plus.dart';
 
 import 'package:fluffychat/l10n/l10n.dart';
+import '../../utils/platform_infos.dart';
 
 class QrScannerModal extends StatefulWidget {
   final void Function(String) onScan;
@@ -22,9 +22,9 @@ class QrScannerModalState extends State<QrScannerModal> {
   @override
   void reassemble() {
     super.reassemble();
-    if (Platform.isAndroid) {
+    if (PlatformInfos.isAndroid) {
       controller!.pauseCamera();
-    } else if (Platform.isIOS) {
+    } else if (PlatformInfos.isIOS) {
       controller!.resumeCamera();
     }
   }
@@ -61,7 +61,7 @@ class QrScannerModalState extends State<QrScannerModal> {
     this.controller = controller;
     // Workaround for QR Scanner is started in Pause mode
     // https://github.com/juliuscanute/qr_code_scanner/issues/538#issuecomment-1133883828
-    if (Platform.isAndroid) {
+    if (PlatformInfos.isAndroid) {
       controller.pauseCamera();
     }
     controller.resumeCamera();

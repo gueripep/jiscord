@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:flutter/foundation.dart';
 
 import 'package:collection/collection.dart';
@@ -148,7 +146,7 @@ abstract class ClientManager {
       html.Notification(title, body: body);
       return;
     }
-    if (Platform.isLinux) {
+    if (PlatformInfos.isLinux) {
       await NotificationsClient().notify(
         title,
         body: body,
